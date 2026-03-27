@@ -5,6 +5,9 @@ public struct MainView: View {
     @Bindable var workspaceState: WorkspaceState
     @State private var canvasSize: CGSize = CGSize(width: 800, height: 600)
     @State private var showSidebar: Bool = false
+    @State private var showBookmarks: Bool = false
+    @State private var showBookmarkNameInput: Bool = false
+    @State private var newBookmarkName: String = ""
 
     public init(canvasState: CanvasState, workspaceState: WorkspaceState) {
         self.canvasState = canvasState
@@ -13,7 +16,8 @@ public struct MainView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            ToolbarView(canvasState: canvasState, canvasSize: $canvasSize, showSidebar: $showSidebar)
+            ToolbarView(canvasState: canvasState, canvasSize: $canvasSize, showSidebar: $showSidebar,
+                        showBookmarks: $showBookmarks, showBookmarkNameInput: $showBookmarkNameInput)
 
             HStack(spacing: 0) {
                 if showSidebar {
@@ -22,13 +26,21 @@ public struct MainView: View {
                 }
 
                 ZStack(alignment: .bottomTrailing) {
-                    InfiniteCanvasView(canvasState: canvasState)
-                        .background(
-                            GeometryReader { geometry in
-                                Color.clear.onAppear { canvasSize = geometry.size }
-                                    .onChange(of: geometry.size) { _, newSize in canvasSize = newSize }
-                            }
-                        )
+                    ZStack(alignment: .topTrailing) {
+                        InfiniteCanvasView(canvasState: canvasState)
+                            .background(
+                                GeometryReader { geometry in
+                                    Color.clear.onAppear { canvasSize = geometry.size }
+                                        .onChange(of: geometry.size) { _, newSize in canvasSize = newSize }
+                                }
+                            )
+
+                        if showBookmarks {
+                            BookmarkedAreaListView(canvasState: canvasState)
+                                .padding(8)
+                                .transition(.move(edge: .trailing).combined(with: .opacity))
+                        }
+                    }
 
                     MinimapView(canvasState: canvasState, canvasSize: canvasSize)
                         .padding(8)
@@ -39,6 +51,19 @@ public struct MainView: View {
         .onAppear { loadWorkspace() }
         .onKeyPress(.delete) { canvasState.deleteSelected(); return .handled }
         .onKeyPress(.escape) { canvasState.selectedWidgetId = nil; canvasState.toolMode = .select; return .handled }
+        .onKeyPress(characters: CharacterSet(charactersIn: "b"), phases: .down) { press in
+            if press.modifiers == [.command, .shift] {
+                showBookmarkNameInput = true
+                return .handled
+            } else if press.modifiers == .command {
+                withAnimation(.easeInOut(duration: 0.2)) { showBookmarks.toggle() }
+                return .handled
+            }
+            return .ignored
+        }
+        .sheet(isPresented: $showBookmarkNameInput) {
+            BookmarkNameInputSheet(canvasState: canvasState, isPresented: $showBookmarkNameInput)
+        }
     }
 
     private func loadWorkspace() {
@@ -53,11 +78,16 @@ public struct ToolbarView: View {
     @Bindable var canvasState: CanvasState
     @Binding var canvasSize: CGSize
     @Binding var showSidebar: Bool
+    @Binding var showBookmarks: Bool
+    @Binding var showBookmarkNameInput: Bool
 
-    public init(canvasState: CanvasState, canvasSize: Binding<CGSize>, showSidebar: Binding<Bool>) {
+    public init(canvasState: CanvasState, canvasSize: Binding<CGSize>, showSidebar: Binding<Bool>,
+                showBookmarks: Binding<Bool>, showBookmarkNameInput: Binding<Bool>) {
         self.canvasState = canvasState
         self._canvasSize = canvasSize
         self._showSidebar = showSidebar
+        self._showBookmarks = showBookmarks
+        self._showBookmarkNameInput = showBookmarkNameInput
     }
 
     public var body: some View {
@@ -104,6 +134,20 @@ public struct ToolbarView: View {
                 }.buttonStyle(.bordered)
             }
 
+            Divider().frame(height: 16)
+
+            Button(action: { showBookmarkNameInput = true }) {
+                Label("Bookmark", systemImage: "bookmark")
+            }
+            .buttonStyle(.bordered)
+            .help("Bookmark current view (Cmd+Shift+B)")
+
+            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { showBookmarks.toggle() } }) {
+                Label("Areas", systemImage: "list.bullet")
+            }
+            .buttonStyle(.bordered)
+            .help("Toggle bookmarks panel (Cmd+B)")
+
             Spacer()
 
             Text(String(format: "%.0f%%", canvasState.scale * 100))
@@ -120,5 +164,40 @@ public struct ToolbarView: View {
             screenX: canvasSize.width / 2, screenY: canvasSize.height / 2,
             panX: canvasState.panX, panY: canvasState.panY, scale: canvasState.scale)
         action(world.worldX, world.worldY)
+    }
+}
+
+struct BookmarkNameInputSheet: View {
+    @Bindable var canvasState: CanvasState
+    @Binding var isPresented: Bool
+    @State private var name: String = ""
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Bookmark Current View")
+                .font(.headline)
+
+            TextField("Bookmark name", text: $name)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit { save() }
+
+            HStack {
+                Button("Cancel") { isPresented = false }
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("Save") { save() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(20)
+        .frame(width: 300)
+    }
+
+    private func save() {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        canvasState.addBookmarkedArea(name: trimmed)
+        isPresented = false
     }
 }

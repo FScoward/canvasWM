@@ -313,6 +313,22 @@ public struct DesktopBrowser: Codable, Identifiable {
     }
 }
 
+// MARK: - BookmarkedArea
+
+public struct BookmarkedArea: Codable, Identifiable {
+    public let id: String
+    public var name: String
+    public var panX: Double
+    public var panY: Double
+    public var scale: Double
+    public var createdAt: Date
+
+    public init(id: String = UUID().uuidString, name: String, panX: Double, panY: Double, scale: Double, createdAt: Date = .now) {
+        self.id = id; self.name = name; self.panX = panX; self.panY = panY
+        self.scale = scale; self.createdAt = createdAt
+    }
+}
+
 // MARK: - Workspace
 
 public struct Workspace: Codable, Identifiable {
@@ -339,6 +355,7 @@ public struct CanvasData: Codable {
     public var terminals: [String: TerminalState]
     public var browsers: [String: BrowserState]
     public var fileManagers: [String: FileManagerState]
+    public var bookmarkedAreas: [String: BookmarkedArea]
     public var nextZIndex: Int
 
     public init(
@@ -347,11 +364,30 @@ public struct CanvasData: Codable {
         drawings: [String: Drawing] = [:], images: [String: ImageModel] = [:],
         markdowns: [String: MarkdownNote] = [:], terminals: [String: TerminalState] = [:],
         browsers: [String: BrowserState] = [:], fileManagers: [String: FileManagerState] = [:],
+        bookmarkedAreas: [String: BookmarkedArea] = [:],
         nextZIndex: Int = 1
     ) {
         self.scale = scale; self.panX = panX; self.panY = panY
         self.stickyNotes = stickyNotes; self.frames = frames; self.drawings = drawings
         self.images = images; self.markdowns = markdowns; self.terminals = terminals
-        self.browsers = browsers; self.fileManagers = fileManagers; self.nextZIndex = nextZIndex
+        self.browsers = browsers; self.fileManagers = fileManagers
+        self.bookmarkedAreas = bookmarkedAreas; self.nextZIndex = nextZIndex
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        scale = try container.decode(Double.self, forKey: .scale)
+        panX = try container.decode(Double.self, forKey: .panX)
+        panY = try container.decode(Double.self, forKey: .panY)
+        stickyNotes = try container.decode([String: StickyNote].self, forKey: .stickyNotes)
+        frames = try container.decode([String: Frame].self, forKey: .frames)
+        drawings = try container.decode([String: Drawing].self, forKey: .drawings)
+        images = try container.decode([String: ImageModel].self, forKey: .images)
+        markdowns = try container.decode([String: MarkdownNote].self, forKey: .markdowns)
+        terminals = try container.decode([String: TerminalState].self, forKey: .terminals)
+        browsers = try container.decode([String: BrowserState].self, forKey: .browsers)
+        fileManagers = try container.decode([String: FileManagerState].self, forKey: .fileManagers)
+        bookmarkedAreas = try container.decodeIfPresent([String: BookmarkedArea].self, forKey: .bookmarkedAreas) ?? [:]
+        nextZIndex = try container.decode(Int.self, forKey: .nextZIndex)
     }
 }

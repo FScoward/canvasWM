@@ -129,6 +129,30 @@ public final class CanvasWMState {
         highlightedWindowIds.removeAll()
     }
 
+    // MARK: - Bookmarked Areas
+
+    public var bookmarkedAreas: [String: BookmarkedArea] = [:]
+
+    public func addBookmarkedArea(name: String) {
+        let id = UUID().uuidString
+        bookmarkedAreas[id] = BookmarkedArea(id: id, name: name, panX: viewportX, panY: viewportY, scale: scale)
+    }
+
+    public func deleteBookmarkedArea(id: String) {
+        bookmarkedAreas.removeValue(forKey: id)
+    }
+
+    public func renameBookmarkedArea(id: String, name: String) {
+        bookmarkedAreas[id]?.name = name
+    }
+
+    public func jumpToArea(id: String, engine: CanvasWMEngine) {
+        guard let area = bookmarkedAreas[id] else { return }
+        viewportX = area.panX
+        viewportY = area.panY
+        engine.syncToScreen()
+    }
+
     public var sortedWindows: [ManagedWindow] {
         windows.values.sorted { $0.zIndex < $1.zIndex }
     }

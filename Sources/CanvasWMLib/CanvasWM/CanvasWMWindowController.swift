@@ -316,6 +316,8 @@ public final class CanvasWMWindowController {
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, (self.isActive || self.isMetaKeyShowing) else { return event }
+            // Don't intercept keys when another window (e.g. bookmark input panel) is key
+            if event.window != self.minimapWindow { return event }
             if event.keyCode == 53 { self.deactivate(); return nil } // Esc
             if event.modifierFlags.contains(.control) && event.keyCode == 15 { // Ctrl+R
                 self.engine.captureAndPlaceWindows()

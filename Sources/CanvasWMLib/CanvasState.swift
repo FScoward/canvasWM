@@ -192,6 +192,28 @@ public final class CanvasState {
         }
     }
 
+    // MARK: - BookmarkedArea CRUD
+
+    public var bookmarkedAreas: [String: BookmarkedArea] = [:]
+
+    public func addBookmarkedArea(name: String) {
+        let id = UUID().uuidString
+        bookmarkedAreas[id] = BookmarkedArea(id: id, name: name, panX: panX, panY: panY, scale: scale)
+    }
+
+    public func deleteBookmarkedArea(id: String) {
+        bookmarkedAreas.removeValue(forKey: id)
+    }
+
+    public func renameBookmarkedArea(id: String, name: String) {
+        bookmarkedAreas[id]?.name = name
+    }
+
+    public func jumpToArea(id: String) {
+        guard let area = bookmarkedAreas[id] else { return }
+        panX = area.panX; panY = area.panY; scale = area.scale
+    }
+
     // MARK: - Generic
 
     public func bringToFront(id: String) {
@@ -257,7 +279,8 @@ public final class CanvasState {
     public func toCanvasData() -> CanvasData {
         CanvasData(scale: scale, panX: panX, panY: panY, stickyNotes: stickyNotes, frames: frames,
                    drawings: drawings, images: images, markdowns: markdowns, terminals: terminals,
-                   browsers: browsers, fileManagers: fileManagers, nextZIndex: nextZIndex)
+                   browsers: browsers, fileManagers: fileManagers, bookmarkedAreas: bookmarkedAreas,
+                   nextZIndex: nextZIndex)
     }
 
     public func loadFromCanvasData(_ data: CanvasData) {
@@ -265,13 +288,14 @@ public final class CanvasState {
         stickyNotes = data.stickyNotes; frames = data.frames; drawings = data.drawings
         images = data.images; markdowns = data.markdowns; terminals = data.terminals
         browsers = data.browsers; fileManagers = data.fileManagers
+        bookmarkedAreas = data.bookmarkedAreas
         nextZIndex = data.nextZIndex; selectedWidgetId = nil
     }
 
     public func reset() {
         scale = 1.0; panX = 0; panY = 0
         stickyNotes = [:]; frames = [:]; drawings = [:]; images = [:]; markdowns = [:]
-        terminals = [:]; browsers = [:]; fileManagers = [:]
+        terminals = [:]; browsers = [:]; fileManagers = [:]; bookmarkedAreas = [:]
         selectedWidgetId = nil; nextZIndex = 1; toolMode = .select
     }
 }
