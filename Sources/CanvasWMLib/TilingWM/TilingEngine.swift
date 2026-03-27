@@ -15,6 +15,8 @@ public final class CanvasWMEngine {
     private var lastAppliedPositions: [String: CGPoint] = [:]
     /// True while the user is dragging a window or widget on the minimap
     public var isDragging: Bool = false
+    /// Frames to skip reverse sync after startSync to avoid false user-move detection
+    private var reverseSyncCooldown: Int = 0
 
     /// Directory and file for external notification triggers
     private static let notifyDir: URL = {
@@ -81,6 +83,18 @@ public final class CanvasWMEngine {
                 lastAppliedPositions.removeValue(forKey: id)
             }
         }
+
+        // Pre-seed lastAppliedPositions so the first syncToScreen doesn't
+        // re-apply positions unnecessarily (which causes windows to shift).
+        let screen = state.primaryVisibleFrame
+        let screenSize = (w: Double(screen.width), h: Double(screen.height))
+        for win in state.sortedWindows {
+            guard win.ownerPid != nil else { continue }
+            if lastAppliedPositions[win.id] == nil {
+                let r = state.screenRect(for: win, screenSize: screenSize)
+                lastAppliedPositions[win.id] = CGPoint(x: r.x, y: r.y)
+            }
+        }
     }
 
     // MARK: - Bidirectional sync
@@ -89,6 +103,8 @@ public final class CanvasWMEngine {
         guard !isArranging else { return }
         isArranging = true
         defer { isArranging = false }
+
+        if reverseSyncCooldown > 0 { reverseSyncCooldown -= 1 }
 
         let screen = state.primaryVisibleFrame
         guard screen.width > 0 else { return }
@@ -109,6 +125,9 @@ public final class CanvasWMEngine {
                 if let last = lastAppliedPositions[win.id],
                    abs(targetPos.x - last.x) < 1 && abs(targetPos.y - last.y) < 1,
                    last.x < 90000 {
+                    // Skip reverse sync during cooldown to avoid false detection
+                    // right after startSync (Accessibility API moves are async).
+                    if reverseSyncCooldown > 0 { continue }
                     // Target unchanged — detect user-initiated moves and sync to canvas
                     if let actual = windowCapture.getWindowPosition(pid: pid, windowTitle: win.windowTitle, windowId: win.windowId.map { CGWindowID($0) }) {
                         let actualX = Double(actual.position.x)
@@ -155,6 +174,9 @@ public final class CanvasWMEngine {
     // MARK: - Start/stop continuous sync
 
     public func startSync(interval: TimeInterval = 1.0 / 30.0) {
+        // Skip reverse-sync for the first ~5 frames (~167ms at 30fps) so
+        // Accessibility API position writes finish before we read back.
+        reverseSyncCooldown = 5
         syncTimer?.invalidate()
         syncTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             self?.syncToScreen()
