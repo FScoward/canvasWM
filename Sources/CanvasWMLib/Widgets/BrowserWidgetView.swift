@@ -6,18 +6,25 @@ public struct BrowserWidgetView: View {
     let isSelected: Bool
     @Bindable var canvasState: CanvasState
     @State private var urlInput: String = ""
+    @State private var webViewStore = WebViewStore()
 
     public var body: some View {
         VStack(spacing: 0) {
             // Header with URL bar
             HStack(spacing: 4) {
-                Button(action: { /* goBack handled via coordinator */ }) {
+                Button(action: { webViewStore.webView?.goBack() }) {
                     Image(systemName: "chevron.left").font(.system(size: 10))
-                }.buttonStyle(.plain)
-                Button(action: { /* goForward */ }) {
+                }
+                .buttonStyle(.plain)
+                .disabled(!(webViewStore.canGoBack))
+
+                Button(action: { webViewStore.webView?.goForward() }) {
                     Image(systemName: "chevron.right").font(.system(size: 10))
-                }.buttonStyle(.plain)
-                Button(action: { /* reload */ }) {
+                }
+                .buttonStyle(.plain)
+                .disabled(!(webViewStore.canGoForward))
+
+                Button(action: { webViewStore.webView?.reload() }) {
                     Image(systemName: "arrow.clockwise").font(.system(size: 10))
                 }.buttonStyle(.plain)
 
@@ -38,7 +45,7 @@ public struct BrowserWidgetView: View {
             .background(.bar)
 
             // WebView
-            WebViewRepresentable(url: browser.url)
+            WebViewRepresentable(url: browser.url, store: webViewStore)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(width: browser.width * canvasState.scale, height: browser.height * canvasState.scale)
@@ -47,15 +54,33 @@ public struct BrowserWidgetView: View {
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2))
         .onTapGesture { canvasState.bringToFront(id: browser.id) }
         .onAppear { urlInput = browser.url }
+        .onChange(of: webViewStore.currentURL) { _, newURL in
+            if let newURL, !newURL.isEmpty { urlInput = newURL }
+        }
     }
+}
+
+@Observable
+class WebViewStore {
+    var webView: WKWebView?
+    var canGoBack: Bool = false
+    var canGoForward: Bool = false
+    var currentURL: String?
 }
 
 struct WebViewRepresentable: NSViewRepresentable {
     let url: String
+    let store: WebViewStore
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(store: store)
+    }
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         let webView = WKWebView(frame: .zero, configuration: config)
+        webView.navigationDelegate = context.coordinator
+        store.webView = webView
         if let url = URL(string: url) { webView.load(URLRequest(url: url)) }
         return webView
     }
@@ -63,6 +88,26 @@ struct WebViewRepresentable: NSViewRepresentable {
     func updateNSView(_ webView: WKWebView, context: Context) {
         if let url = URL(string: url), webView.url?.absoluteString != url.absoluteString {
             webView.load(URLRequest(url: url))
+        }
+    }
+
+    class Coordinator: NSObject, WKNavigationDelegate {
+        let store: WebViewStore
+
+        init(store: WebViewStore) {
+            self.store = store
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            store.canGoBack = webView.canGoBack
+            store.canGoForward = webView.canGoForward
+            store.currentURL = webView.url?.absoluteString
+        }
+
+        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+            store.canGoBack = webView.canGoBack
+            store.canGoForward = webView.canGoForward
+            store.currentURL = webView.url?.absoluteString
         }
     }
 }

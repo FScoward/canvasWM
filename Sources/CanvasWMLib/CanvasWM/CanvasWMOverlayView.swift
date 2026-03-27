@@ -160,7 +160,7 @@ public struct CanvasWMOverlayView: View {
                 let x = br.x * state.scale + state.panX + w / 2
                 let y = br.y * state.scale + state.panY + h / 2
                 RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.blue.opacity(0.15))
+                    .fill(Color.orange.opacity(0.2))
                     .frame(width: w, height: h)
                     .overlay(
                         HStack(spacing: 2) {
@@ -174,7 +174,7 @@ public struct CanvasWMOverlayView: View {
                         .padding(2)
                         , alignment: .topLeading
                     )
-                    .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.blue.opacity(0.5), lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.orange.opacity(0.7), lineWidth: 1.5))
                     .position(x: x, y: y)
                     .gesture(widgetDragGesture(id: br.id, currentX: br.x, currentY: br.y))
             }
