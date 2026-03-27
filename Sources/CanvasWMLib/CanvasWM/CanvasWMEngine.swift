@@ -15,6 +15,8 @@ public final class CanvasWMEngine {
     private var lastAppliedPositions: [String: CGPoint] = [:]
     /// True while the user is dragging a window or widget on the minimap
     public var isDragging: Bool = false
+    /// When true, suppress user-move detection for floating widgets (minimap is showing)
+    public var isMinimapShowing: Bool = false
     /// Frames to skip reverse sync after startSync to avoid false user-move detection
     private var reverseSyncCooldown: Int = 0
 
@@ -164,10 +166,12 @@ public final class CanvasWMEngine {
             }
         }
 
-        // Sync floating widget positions
+        // Sync floating widget positions (suppress user-move detection during minimap
+        // because makeKeyAndOrderFront causes panels to shift, triggering false positives)
         stickyNoteController?.syncPositions(
             viewportX: state.viewportX, viewportY: state.viewportY,
-            screenFrame: state.primaryScreenFrame
+            screenFrame: state.primaryScreenFrame,
+            forceSkipUserMoveDetection: isMinimapShowing
         )
     }
 

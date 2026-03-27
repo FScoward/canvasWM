@@ -95,9 +95,59 @@ public final class StickyNoteWindowController {
         for br in browsers.values { showBrowserWindow(br) }
     }
 
+    /// Capture actual panel screen positions into canvas coordinates.
+    /// Call before starting sync so canvas coords are fresh and syncPositions
+    /// won't force widgets back to stale persisted positions.
+    public func captureCurrentPositions(viewportX: Double, viewportY: Double, screenFrame: CGRect) {
+        let screenW = Double(screenFrame.width)
+        let screenH = Double(screenFrame.height)
+        for (id, panel) in windows {
+            let frame = panel.frame
+            let fx = Double(frame.origin.x)
+            let fy = Double(frame.origin.y)
+
+            // Skip panels that are off-screen (placed there by syncPanel during viewport drag)
+            // Their canvas coords from the last sync are still correct.
+            let isOffScreen = fx < -200 || fx > screenW + 200 || fy < -200 || fy > screenH + 200
+            if isOffScreen {
+                continue
+            }
+
+            // Get model height and current canvas coords
+            var h: Double = Double(frame.height)
+            var curCanvasX: Double = 0, curCanvasY: Double = 0
+            if let note = notes[id] { h = note.height; curCanvasX = note.x; curCanvasY = note.y }
+            else if let md = markdowns[id] { h = md.height; curCanvasX = md.x; curCanvasY = md.y }
+            else if let br = browsers[id] { h = br.height; curCanvasX = br.x; curCanvasY = br.y }
+            else { continue }
+
+            // Check if panel is at the position canvas coords predict
+            let expectedScreenX = curCanvasX - viewportX
+            let expectedFlippedY = Double(screenFrame.height) - (curCanvasY - viewportY) - h + Double(screenFrame.minY)
+            let dx = abs(fx - expectedScreenX)
+            let dy = abs(fy - expectedFlippedY)
+
+            if dx <= 5 && dy <= 5 {
+                continue
+            }
+
+            // Panel is on-screen but doesn't match canvas coords — recapture
+            let screenY = screenH - fy - h + Double(screenFrame.minY)
+            let canvasX = fx + viewportX
+            let canvasY = screenY + viewportY
+            if notes[id] != nil { notes[id]?.x = canvasX; notes[id]?.y = canvasY }
+            if markdowns[id] != nil { markdowns[id]?.x = canvasX; markdowns[id]?.y = canvasY }
+            if browsers[id] != nil { browsers[id]?.x = canvasX; browsers[id]?.y = canvasY }
+            lastAppliedFrames[id] = frame
+        }
+        lastViewportX = viewportX
+        lastViewportY = viewportY
+    }
+
     // MARK: - Viewport Sync
 
-    public func syncPositions(viewportX: Double, viewportY: Double, screenFrame: CGRect) {
+    public func syncPositions(viewportX: Double, viewportY: Double, screenFrame: CGRect,
+                              forceSkipUserMoveDetection: Bool = false) {
         isSyncing = true
         defer { isSyncing = false }
 
@@ -106,20 +156,22 @@ public final class StickyNoteWindowController {
         lastViewportX = viewportX
         lastViewportY = viewportY
 
+        let skipUserMove = forceSkipUserMoveDetection || viewportMoved
+
         for (id, note) in notes {
             syncPanel(id: id, canvasX: note.x, canvasY: note.y, w: note.width, h: note.height,
                       viewportX: viewportX, viewportY: viewportY, screenFrame: screenFrame,
-                      skipUserMoveDetection: viewportMoved)
+                      skipUserMoveDetection: skipUserMove)
         }
         for (id, md) in markdowns {
             syncPanel(id: id, canvasX: md.x, canvasY: md.y, w: md.width, h: md.height,
                       viewportX: viewportX, viewportY: viewportY, screenFrame: screenFrame,
-                      skipUserMoveDetection: viewportMoved)
+                      skipUserMoveDetection: skipUserMove)
         }
         for (id, br) in browsers {
             syncPanel(id: id, canvasX: br.x, canvasY: br.y, w: br.width, h: br.height,
                       viewportX: viewportX, viewportY: viewportY, screenFrame: screenFrame,
-                      skipUserMoveDetection: viewportMoved)
+                      skipUserMoveDetection: skipUserMove)
         }
     }
 
@@ -158,14 +210,12 @@ public final class StickyNoteWindowController {
 
         if visible {
             let flippedY = Double(screenFrame.height) - screenY - h + Double(screenFrame.minY)
-            let newFrame = CGRect(x: screenX, y: flippedY, width: w, height: h)
-            // Skip setFrame when the panel is already at the target position
-            // to avoid interfering with user drag operations
+            // Only update position, preserve panel's current size (frame includes title bar)
             let cur = panel.frame
-            if abs(newFrame.origin.x - cur.origin.x) > 1
-                || abs(newFrame.origin.y - cur.origin.y) > 1
-                || abs(newFrame.width - cur.width) > 1
-                || abs(newFrame.height - cur.height) > 1 {
+            if abs(screenX - Double(cur.origin.x)) > 1
+                || abs(flippedY - Double(cur.origin.y)) > 1 {
+                var newFrame = cur
+                newFrame.origin = CGPoint(x: screenX, y: flippedY)
                 panel.setFrame(newFrame, display: true)
                 lastAppliedFrames[id] = newFrame
             }
@@ -173,7 +223,8 @@ public final class StickyNoteWindowController {
         } else {
             let cur = panel.frame
             if cur.origin.x != -10000 || cur.origin.y != -10000 {
-                let offFrame = CGRect(x: -10000, y: -10000, width: w, height: h)
+                var offFrame = cur
+                offFrame.origin = CGPoint(x: -10000, y: -10000)
                 panel.setFrame(offFrame, display: false)
                 lastAppliedFrames[id] = offFrame
             }
@@ -220,6 +271,7 @@ public final class StickyNoteWindowController {
         registerObservers(id: noteId, panel: panel)
         panel.orderFront(nil)
         windows[noteId] = panel
+        lastAppliedFrames[noteId] = panel.frame
     }
 
     private func showMarkdownWindow(_ md: DesktopMarkdownNote) {
@@ -241,6 +293,7 @@ public final class StickyNoteWindowController {
         registerObservers(id: mdId, panel: panel)
         panel.orderFront(nil)
         windows[mdId] = panel
+        lastAppliedFrames[mdId] = panel.frame
     }
 
     private func showBrowserWindow(_ br: DesktopBrowser) {
@@ -262,6 +315,7 @@ public final class StickyNoteWindowController {
         registerObservers(id: brId, panel: panel)
         panel.orderFront(nil)
         windows[brId] = panel
+        lastAppliedFrames[brId] = panel.frame
     }
 
     private func registerObservers(id: String, panel: NSPanel) {

@@ -67,6 +67,12 @@ public final class CanvasWMWindowController {
         isActive = true
         if !isPrepared {
             if let screen = NSScreen.main { wmState.pinPrimaryScreen(screen) }
+        }
+        stickyNoteController?.captureCurrentPositions(
+            viewportX: wmState.viewportX, viewportY: wmState.viewportY,
+            screenFrame: wmState.primaryScreenFrame)
+        engine.isMinimapShowing = true
+        if !isPrepared {
             _ = WindowCapture.shared.requestAccessibilityPermission()
             engine.captureAndPlaceWindows()
             engine.captureAllThumbnails()
@@ -83,6 +89,7 @@ public final class CanvasWMWindowController {
     public func deactivate() {
         guard isActive else { return }
         isActive = false
+        engine.isMinimapShowing = false
         engine.stopSync()
         unregisterKeyMonitors()
         minimapWindow?.orderOut(nil)
@@ -112,6 +119,11 @@ public final class CanvasWMWindowController {
         if !isPrepared {
             prepare()
         }
+        // Capture floating widget positions before sync starts
+        stickyNoteController?.captureCurrentPositions(
+            viewportX: wmState.viewportX, viewportY: wmState.viewportY,
+            screenFrame: wmState.primaryScreenFrame)
+        engine.isMinimapShowing = true
         // Refresh window state
         engine.captureAndPlaceWindows()
         engine.captureAllThumbnails()
@@ -144,12 +156,14 @@ public final class CanvasWMWindowController {
             return
         }
         isMetaKeyShowing = false
+        // Keep isMinimapShowing=true until stopSync to prevent user-move false positives
         fadeOutWork?.cancel()
         stopMouseTracking()
         stopInactivityTimer()
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.engine.stopSync()
+            self.engine.isMinimapShowing = false
             self.unregisterKeyMonitors()
             self.minimapWindow?.orderOut(nil)
         }
