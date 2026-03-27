@@ -209,27 +209,27 @@ public struct CanvasWMOverlayView: View {
     private var statusBar: some View {
         VStack {
             Spacer()
-            HStack(spacing: 8) {
+            HStack(spacing: 12) {
                 Text("\(state.windows.count) windows")
 
                 Spacer()
 
                 Button(action: { promptBookmarkName() }) {
-                    HStack(spacing: 2) {
+                    HStack(spacing: 4) {
                         Image(systemName: "bookmark")
                         Text("Save")
                     }
-                    .font(.system(size: 10))
+                    .font(.system(size: 13))
                 }
                 .buttonStyle(.plain)
                 .foregroundColor(.blue)
 
                 Button(action: { withAnimation(.easeInOut(duration: 0.2)) { showBookmarks.toggle() } }) {
-                    HStack(spacing: 2) {
+                    HStack(spacing: 4) {
                         Image(systemName: "list.bullet")
                         Text("Areas")
                     }
-                    .font(.system(size: 10))
+                    .font(.system(size: 13))
                 }
                 .buttonStyle(.plain)
                 .foregroundColor(.blue)
@@ -237,10 +237,10 @@ public struct CanvasWMOverlayView: View {
                 Text(String(format: "%.0f%%", state.scale * 100))
                     .foregroundColor(.blue)
             }
-            .font(.system(size: 10, design: .monospaced))
+            .font(.system(size: 13, design: .monospaced))
             .foregroundColor(.secondary)
-            .padding(.horizontal, 8)
-            .padding(.bottom, 4)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 6)
         }
     }
 
@@ -420,40 +420,40 @@ struct WMBookmarkedAreaListView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("Bookmarks")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                 Spacer()
                 Button(action: { showBookmarks = false }) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 9))
+                        .font(.system(size: 11))
                 }
                 .buttonStyle(.plain)
                 .foregroundColor(.secondary)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
 
             Divider()
 
             if sortedAreas.isEmpty {
                 Text("No bookmarks yet.\nClick \"Save\" to bookmark\nthe current viewport position.")
-                    .font(.system(size: 10))
+                    .font(.system(size: 13))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
-                    .padding(12)
+                    .padding(16)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 2) {
+                    LazyVStack(spacing: 3) {
                         ForEach(sortedAreas) { area in
-                            HStack(spacing: 4) {
+                            HStack(spacing: 6) {
                                 Image(systemName: "bookmark.fill")
-                                    .font(.system(size: 8))
+                                    .font(.system(size: 12))
                                     .foregroundColor(.blue)
 
                                 if editingId == area.id {
                                     TextField("Name", text: $editingName)
                                         .textFieldStyle(.plain)
-                                        .font(.system(size: 11))
+                                        .font(.system(size: 13))
                                         .onSubmit {
                                             if !editingName.isEmpty {
                                                 state.renameBookmarkedArea(id: area.id, name: editingName)
@@ -462,16 +462,16 @@ struct WMBookmarkedAreaListView: View {
                                         }
                                 } else {
                                     Text(area.name)
-                                        .font(.system(size: 11))
+                                        .font(.system(size: 13))
                                         .lineLimit(1)
                                         .truncationMode(.tail)
                                 }
 
                                 Spacer()
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(RoundedRectangle(cornerRadius: 3).fill(Color.primary.opacity(0.05)))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.05)))
                             .contentShape(Rectangle())
                             .onTapGesture { state.jumpToArea(id: area.id, engine: engine) }
                             .contextMenu {
@@ -485,51 +485,44 @@ struct WMBookmarkedAreaListView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
                 }
             }
         }
-        .frame(width: 200)
+        .frame(width: 260)
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .shadow(color: .black.opacity(0.2), radius: 6, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 2)
     }
 }
 
-// MARK: - Bookmark Name Prompt (uses osascript for reliable keyboard input)
+// MARK: - Bookmark Name Prompt (native NSAlert for reliable frontmost display)
 
 enum BookmarkNamePrompt {
-    /// Shows an AppleScript input dialog (runs as a separate OS process, so keyboard focus is reliable)
     static func prompt(defaultName: String, completion: @escaping (String?) -> Void) {
-        DispatchQueue.global(qos: .userInteractive).async {
-            let script = """
-            display dialog "Enter a name for this bookmark:" default answer "\(defaultName)" \
-            with title "Bookmark Current Position" buttons {"Cancel", "Save"} default button "Save"
-            """
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            process.arguments = ["-e", script]
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = FileHandle.nullDevice
-            do {
-                try process.run()
-                process.waitUntilExit()
-                if process.terminationStatus == 0 {
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    if let output = String(data: data, encoding: .utf8) {
-                        // osascript returns "button returned:Save, text returned:NAME"
-                        let parts = output.components(separatedBy: "text returned:")
-                        if parts.count >= 2 {
-                            let name = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
-                            DispatchQueue.main.async { completion(name.isEmpty ? nil : name) }
-                            return
-                        }
-                    }
-                }
-            } catch {}
-            DispatchQueue.main.async { completion(nil) }
+        DispatchQueue.main.async {
+            NSApp.activate(ignoringOtherApps: true)
+
+            let alert = NSAlert()
+            alert.messageText = "Bookmark Current Position"
+            alert.informativeText = "Enter a name for this bookmark:"
+            alert.addButton(withTitle: "Save")
+            alert.addButton(withTitle: "Cancel")
+
+            let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+            input.stringValue = defaultName
+            alert.accessoryView = input
+            alert.window.initialFirstResponder = input
+            alert.window.level = NSWindow.Level(Int(CGWindowLevelForKey(.maximumWindow)) + 1)
+
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                let name = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                completion(name.isEmpty ? nil : name)
+            } else {
+                completion(nil)
+            }
         }
     }
 }

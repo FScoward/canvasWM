@@ -13,24 +13,24 @@ struct BookmarkedAreaListView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("Bookmarks")
-                    .font(.headline)
+                    .font(.system(size: 15, weight: .semibold))
                 Spacer()
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
 
             Divider()
 
             if sortedAreas.isEmpty {
                 Text("No bookmarks yet.\nUse Cmd+Shift+B to bookmark the current view.")
-                    .font(.caption)
+                    .font(.system(size: 13))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
                     .padding(16)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 2) {
+                    LazyVStack(spacing: 3) {
                         ForEach(sortedAreas) { area in
                             BookmarkedAreaRow(
                                 area: area,
@@ -51,12 +51,12 @@ struct BookmarkedAreaListView: View {
                             )
                         }
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
                 }
             }
         }
-        .frame(width: 220)
+        .frame(width: 280)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 2)
@@ -73,19 +73,19 @@ private struct BookmarkedAreaRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Image(systemName: "bookmark.fill")
-                .font(.system(size: 10))
+                .font(.system(size: 12))
                 .foregroundColor(.accentColor)
 
             if isEditing {
                 TextField("Name", text: $editingName)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .onSubmit { onCommitRename() }
             } else {
                 Text(area.name)
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -93,11 +93,11 @@ private struct BookmarkedAreaRow: View {
             Spacer()
 
             Text(String(format: "%.0f%%", area.scale * 100))
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(.secondary)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
         .background(RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.04)))
         .contentShape(Rectangle())
         .onTapGesture { onJump() }
