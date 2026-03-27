@@ -32,7 +32,7 @@ public struct CanvasWMOverlayView: View {
             .onContinuousHover { phase in
                 if case .active(let loc) = phase { lastMouse = loc }
             }
-            // Scroll zoom is handled by NSEvent monitor in TilingWindowController
+            // Scroll zoom is handled by NSEvent monitor in CanvasWMWindowController
             .onAppear {
                 state.autoFit(minimapSize: geometry.size)
             }

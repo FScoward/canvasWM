@@ -4,25 +4,25 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     public var onTerminate: (() -> Void)?
     private var mainWindow: NSWindow?
-    public let tilingController = TilingWindowController()
+    public let wmController = CanvasWMWindowController()
     public let stickyNoteController = StickyNoteWindowController()
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBarIcon()
         mainWindow = NSApplication.shared.windows.first
-        tilingController.stickyNoteController = stickyNoteController
+        wmController.stickyNoteController = stickyNoteController
         stickyNoteController.restoreAllWindows()
         // Prepare canvas WM (hidden) — minimap appears on Option+Control hold
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.tilingController.prepare()
+            self?.wmController.prepare()
         }
     }
 
     public func applicationShouldTerminateAfterLastWindowClosed(_ app: NSApplication) -> Bool { false }
 
     public func applicationWillTerminate(_ notification: Notification) {
-        tilingController.deactivate()
-        tilingController.cleanup()
+        wmController.deactivate()
+        wmController.cleanup()
         onTerminate?()
     }
 
@@ -39,7 +39,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "New Markdown", action: #selector(newMarkdown), keyEquivalent: "m"))
         menu.addItem(NSMenuItem(title: "New Browser", action: #selector(newBrowser), keyEquivalent: "b"))
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Canvas WM (Ctrl+T)", action: #selector(toggleTiling), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Canvas WM (Ctrl+T)", action: #selector(toggleWM), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem?.menu = menu
@@ -63,7 +63,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         stickyNoteController.createBrowser()
     }
 
-    @objc private func toggleTiling() {
-        tilingController.toggle()
+    @objc private func toggleWM() {
+        wmController.toggle()
     }
 }

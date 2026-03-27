@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-public final class TilingWindowController {
+public final class CanvasWMWindowController {
     public let wmState: CanvasWMState
     public let engine: CanvasWMEngine
     private var minimapWindow: NSWindow?
@@ -377,10 +377,10 @@ private class MinimapWindow: NSWindow {
     }
 }
 
-// Close minimap → deactivate tiling
+// Close minimap → deactivate WM
 private class MinimapWindowDelegate: NSObject, NSWindowDelegate {
-    weak var controller: TilingWindowController?
-    init(controller: TilingWindowController) { self.controller = controller }
+    weak var controller: CanvasWMWindowController?
+    init(controller: CanvasWMWindowController) { self.controller = controller }
     func windowWillClose(_ notification: Notification) {
         controller?.deactivate()
     }
