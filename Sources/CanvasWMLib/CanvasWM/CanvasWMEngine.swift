@@ -295,5 +295,43 @@ public final class CanvasWMEngine {
         DispatchQueue.main.asyncAfter(deadline: .now() + 5.0, execute: work)
     }
 
+    // MARK: - Gather windows back to monitor
+
+    /// Move all managed windows back into the primary monitor's visible area.
+    /// Uses cascade layout to avoid stacking all windows at the same position.
+    public func gatherWindowsToMonitor() {
+        let screen = state.primaryVisibleFrame
+        guard screen.width > 0 else { return }
+
+        let cascadeOffset: Double = 30
+        var offsetX: Double = Double(screen.origin.x) + 20
+        var offsetY: Double = Double(screen.origin.y) + 20
+
+        for win in state.sortedWindows {
+            guard let pid = win.ownerPid else { continue }
+
+            // Clamp position so window fits within visible frame
+            let x = min(offsetX, Double(screen.maxX) - win.width)
+            let y = min(offsetY, Double(screen.maxY) - win.height)
+
+            _ = windowCapture.setWindowPosition(
+                pid: pid, windowTitle: win.windowTitle,
+                position: CGPoint(x: x, y: y),
+                size: CGSize(width: win.width, height: win.height),
+                windowId: win.windowId.map { CGWindowID($0) }
+            )
+
+            offsetX += cascadeOffset
+            offsetY += cascadeOffset
+            // Wrap cascade if it goes off-screen
+            if offsetX + win.width > Double(screen.maxX) {
+                offsetX = Double(screen.origin.x) + 20
+            }
+            if offsetY + win.height > Double(screen.maxY) {
+                offsetY = Double(screen.origin.y) + 20
+            }
+        }
+    }
+
     deinit { stopSync(); stopNotifyWatch() }
 }

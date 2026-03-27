@@ -99,6 +99,11 @@ public final class CanvasWMWindowController {
 
     public func toggle() { if isActive { deactivate() } else { activate() } }
 
+    /// Move all managed windows back into the primary monitor
+    public func gatherWindowsToMonitor() {
+        engine.gatherWindowsToMonitor()
+    }
+
     /// Clean up all monitors (call on app termination)
     public func cleanup() {
         unregisterFlagsMonitors()
