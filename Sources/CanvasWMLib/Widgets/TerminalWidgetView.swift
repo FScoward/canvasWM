@@ -106,3 +106,19 @@ public struct TerminalWidgetView: View {
             .replacingOccurrences(of: "\\x1B\\][^\\x07]*\\x07", with: "", options: .regularExpression)
     }
 }
+
+struct TerminalWidgetView_Previews: PreviewProvider {
+    static var previews: some View {
+        let state = CanvasState()
+        let terminal = TerminalState(id: "preview-1", x: 0, y: 0, width: 500, height: 300,
+                                      isAlive: true, themeKey: "dark", zIndex: 0)
+        TerminalWidgetView(terminal: terminal, isSelected: false, canvasState: state)
+            .previewDisplayName("dark theme")
+
+        let state2 = CanvasState()
+        let terminal2 = TerminalState(id: "preview-2", x: 0, y: 0, width: 500, height: 300,
+                                       isAlive: false, themeKey: "dracula", zIndex: 0)
+        TerminalWidgetView(terminal: terminal2, isSelected: true, canvasState: state2)
+            .previewDisplayName("dracula dead")
+    }
+}

@@ -43,3 +43,19 @@ public struct FrameWidgetView: View {
         .onTapGesture { canvasState.bringToFront(id: frame.id) }
     }
 }
+
+struct FrameWidgetView_Previews: PreviewProvider {
+    static var previews: some View {
+        let state = CanvasState()
+        let frame = Frame(id: "preview-1", x: 0, y: 0, width: 400, height: 300,
+                          label: "Feature Group", borderColor: "#3B82F6", backgroundColor: "#3B82F610", zIndex: 0)
+        FrameWidgetView(frame: frame, isSelected: false, canvasState: state)
+            .previewDisplayName("blue")
+
+        let state2 = CanvasState()
+        let frame2 = Frame(id: "preview-2", x: 0, y: 0, width: 400, height: 300,
+                           label: "Selected Group", borderColor: "#10B981", backgroundColor: "#10B98110", zIndex: 0)
+        FrameWidgetView(frame: frame2, isSelected: true, canvasState: state2)
+            .previewDisplayName("selected green")
+    }
+}

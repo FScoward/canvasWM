@@ -111,3 +111,19 @@ struct WebViewRepresentable: NSViewRepresentable {
         }
     }
 }
+
+struct BrowserWidgetView_Previews: PreviewProvider {
+    static var previews: some View {
+        let state = CanvasState()
+        let browser = BrowserState(id: "preview-1", x: 0, y: 0, width: 600, height: 400,
+                                    url: "https://www.example.com", zIndex: 0)
+        BrowserWidgetView(browser: browser, isSelected: false, canvasState: state)
+            .previewDisplayName("example.com")
+
+        let state2 = CanvasState()
+        let browser2 = BrowserState(id: "preview-2", x: 0, y: 0, width: 600, height: 400,
+                                     url: "https://www.google.com", zIndex: 0)
+        BrowserWidgetView(browser: browser2, isSelected: true, canvasState: state2)
+            .previewDisplayName("google selected")
+    }
+}

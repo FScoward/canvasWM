@@ -48,6 +48,21 @@ public struct MarkdownWidgetView: View {
     }
 }
 
+struct MarkdownWidgetView_Previews: PreviewProvider {
+    static var previews: some View {
+        let state = CanvasState()
+        let note = MarkdownNote(id: "preview-1", x: 0, y: 0, width: 500, height: 400,
+                                text: "# Title\n\n## Subtitle\n\nSome paragraph text.\n\n- Item 1\n- Item 2\n- Item 3\n\n### Code\n\n```\nlet x = 42\n```", zIndex: 0)
+        MarkdownWidgetView(note: note, isSelected: false, canvasState: state)
+            .previewDisplayName("rendered")
+
+        let state2 = CanvasState()
+        let note2 = MarkdownNote(id: "preview-2", x: 0, y: 0, text: "", zIndex: 0)
+        MarkdownWidgetView(note: note2, isSelected: false, canvasState: state2)
+            .previewDisplayName("empty")
+    }
+}
+
 struct MarkdownRenderer: View {
     let text: String
 

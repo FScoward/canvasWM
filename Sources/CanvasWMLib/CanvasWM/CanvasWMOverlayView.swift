@@ -12,6 +12,7 @@ public struct CanvasWMOverlayView: View {
     @State private var widgetDragId: String? = nil
     @State private var widgetDragOffset: CGSize = .zero
     @State private var showBookmarks: Bool = false
+    @State private var showWidgetGallery: Bool = false
 
     public init(state: CanvasWMState, engine: CanvasWMEngine) {
         self.state = state
@@ -152,64 +153,150 @@ public struct CanvasWMOverlayView: View {
                 let x = note.x * state.scale + state.panX + w / 2
                 let y = note.y * state.scale + state.panY + h / 2
                 let bgHex = DesktopStickyNote.colors[note.colorName]?.bg ?? "#FFF9C4"
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color(hex: bgHex) ?? .yellow.opacity(0.5))
-                    .frame(width: w, height: h)
-                    .overlay(
-                        Text(note.text.isEmpty ? "Note" : note.text.prefix(20).description)
-                            .font(.system(size: max(7, 9 * state.scale)))
-                            .foregroundColor(.black.opacity(0.6))
-                            .lineLimit(2)
-                            .padding(2)
-                        , alignment: .topLeading
-                    )
-                    .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.orange.opacity(0.5), lineWidth: 1))
-                    .position(x: x, y: y)
-                    .gesture(widgetDragGesture(id: note.id, currentX: note.x, currentY: note.y))
+                let titleHex = DesktopStickyNote.colors[note.colorName]?.titleBg ?? "#FFF176"
+                VStack(spacing: 0) {
+                    // Title bar
+                    HStack(spacing: 3) {
+                        ForEach(DesktopStickyNote.colors.keys.sorted(), id: \.self) { cn in
+                            let dotHex = DesktopStickyNote.colors[cn]?.titleBg ?? "#FFF176"
+                            Circle()
+                                .fill(Color(hex: dotHex) ?? .yellow)
+                                .frame(width: max(3, 5 * state.scale), height: max(3, 5 * state.scale))
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, max(2, 4 * state.scale))
+                    .padding(.vertical, max(1, 2 * state.scale))
+                    .background(Color(hex: titleHex)?.opacity(0.8) ?? .yellow.opacity(0.8))
+
+                    // Content
+                    Text(note.text.isEmpty ? "Double-click to edit..." : note.text)
+                        .font(.system(size: max(5, 10 * state.scale)))
+                        .foregroundColor(note.text.isEmpty ? .black.opacity(0.3) : .black.opacity(0.8))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(max(2, 4 * state.scale))
+                }
+                .frame(width: w, height: h)
+                .background(Color(hex: bgHex) ?? .yellow.opacity(0.5))
+                .cornerRadius(max(2, 4 * state.scale))
+                .shadow(color: .black.opacity(0.15), radius: 2, x: 0.5, y: 1)
+                .overlay(RoundedRectangle(cornerRadius: max(2, 4 * state.scale)).stroke(Color.orange.opacity(0.4), lineWidth: 0.5))
+                .position(x: x, y: y)
+                .gesture(widgetDragGesture(id: note.id, currentX: note.x, currentY: note.y))
             }
             ForEach(markdowns) { md in
                 let w = md.width * state.scale
                 let h = md.height * state.scale
                 let x = md.x * state.scale + state.panX + w / 2
                 let y = md.y * state.scale + state.panY + h / 2
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.purple.opacity(0.2))
-                    .frame(width: w, height: h)
-                    .overlay(
-                        Text(md.text.isEmpty ? "Markdown" : md.text.prefix(20).description)
-                            .font(.system(size: max(7, 9 * state.scale)))
-                            .foregroundColor(.black.opacity(0.6))
-                            .lineLimit(2)
-                            .padding(2)
-                        , alignment: .topLeading
-                    )
-                    .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.purple.opacity(0.5), lineWidth: 1))
-                    .position(x: x, y: y)
-                    .gesture(widgetDragGesture(id: md.id, currentX: md.x, currentY: md.y))
+                VStack(spacing: 0) {
+                    // Toolbar
+                    HStack(spacing: max(2, 4 * state.scale)) {
+                        Image(systemName: "doc.richtext")
+                            .font(.system(size: max(5, 8 * state.scale)))
+                            .foregroundColor(.secondary)
+                        Text("Markdown")
+                            .font(.system(size: max(5, 8 * state.scale), weight: .medium))
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, max(2, 4 * state.scale))
+                    .padding(.vertical, max(1, 3 * state.scale))
+                    .background(Color(nsColor: .windowBackgroundColor).opacity(0.9))
+
+                    // Content preview
+                    VStack(alignment: .leading, spacing: max(1, 2 * state.scale)) {
+                        ForEach(Array(md.text.components(separatedBy: "\n").prefix(15).enumerated()), id: \.offset) { _, line in
+                            if line.hasPrefix("# ") {
+                                Text(line.dropFirst(2))
+                                    .font(.system(size: max(6, 12 * state.scale), weight: .bold))
+                            } else if line.hasPrefix("## ") {
+                                Text(line.dropFirst(3))
+                                    .font(.system(size: max(5, 10 * state.scale), weight: .bold))
+                            } else if line.hasPrefix("- ") {
+                                HStack(alignment: .top, spacing: 2) {
+                                    Text("•").font(.system(size: max(4, 8 * state.scale)))
+                                    Text(line.dropFirst(2)).font(.system(size: max(4, 8 * state.scale)))
+                                }
+                            } else if !line.trimmingCharacters(in: .whitespaces).isEmpty {
+                                Text(line)
+                                    .font(.system(size: max(4, 8 * state.scale)))
+                            }
+                        }
+                    }
+                    .foregroundColor(.primary.opacity(0.8))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(max(2, 4 * state.scale))
+                }
+                .frame(width: w, height: h)
+                .background(Color(nsColor: .controlBackgroundColor))
+                .cornerRadius(max(2, 4 * state.scale))
+                .shadow(color: .black.opacity(0.1), radius: 2, x: 0.5, y: 1)
+                .overlay(RoundedRectangle(cornerRadius: max(2, 4 * state.scale)).stroke(Color.purple.opacity(0.3), lineWidth: 0.5))
+                .position(x: x, y: y)
+                .gesture(widgetDragGesture(id: md.id, currentX: md.x, currentY: md.y))
             }
             ForEach(browsers) { br in
                 let w = br.width * state.scale
                 let h = br.height * state.scale
                 let x = br.x * state.scale + state.panX + w / 2
                 let y = br.y * state.scale + state.panY + h / 2
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.orange.opacity(0.2))
-                    .frame(width: w, height: h)
-                    .overlay(
-                        HStack(spacing: 2) {
-                            Image(systemName: "globe")
-                                .font(.system(size: max(6, 8 * state.scale)))
-                            Text(br.url.prefix(30).description)
-                                .font(.system(size: max(7, 9 * state.scale)))
-                                .lineLimit(1)
-                        }
-                        .foregroundColor(.black.opacity(0.6))
-                        .padding(2)
-                        , alignment: .topLeading
-                    )
-                    .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.orange.opacity(0.7), lineWidth: 1.5))
-                    .position(x: x, y: y)
-                    .gesture(widgetDragGesture(id: br.id, currentX: br.x, currentY: br.y))
+                let shortURL = br.url
+                    .replacingOccurrences(of: "https://www.", with: "")
+                    .replacingOccurrences(of: "https://", with: "")
+                    .replacingOccurrences(of: "http://www.", with: "")
+                    .replacingOccurrences(of: "http://", with: "")
+                VStack(spacing: 0) {
+                    // URL bar - prominent
+                    HStack(spacing: 3) {
+                        Image(systemName: "globe")
+                            .font(.system(size: max(6, 10 * state.scale), weight: .medium))
+                            .foregroundColor(.blue)
+                        Text(shortURL)
+                            .font(.system(size: max(6, 10 * state.scale), weight: .medium))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Spacer()
+                    }
+                    .padding(.horizontal, max(3, 6 * state.scale))
+                    .padding(.vertical, max(2, 4 * state.scale))
+                    .background(Color.blue.opacity(0.08))
+
+                    // Fake web content lines
+                    VStack(alignment: .leading, spacing: max(2, 4 * state.scale)) {
+                        // Title-like block
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Color.primary.opacity(0.15))
+                            .frame(width: w * 0.6, height: max(4, 8 * state.scale))
+                        // Text-like blocks
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Color.primary.opacity(0.08))
+                            .frame(width: w * 0.85, height: max(3, 5 * state.scale))
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Color.primary.opacity(0.08))
+                            .frame(width: w * 0.7, height: max(3, 5 * state.scale))
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Color.primary.opacity(0.08))
+                            .frame(width: w * 0.9, height: max(3, 5 * state.scale))
+                        // Image-like block
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.blue.opacity(0.06))
+                            .frame(width: w * 0.5, height: max(10, 20 * state.scale))
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Color.primary.opacity(0.08))
+                            .frame(width: w * 0.75, height: max(3, 5 * state.scale))
+                    }
+                    .padding(max(3, 6 * state.scale))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
+                .frame(width: w, height: h)
+                .background(Color.white)
+                .cornerRadius(max(2, 4 * state.scale))
+                .shadow(color: .black.opacity(0.15), radius: 2, x: 0.5, y: 1)
+                .overlay(RoundedRectangle(cornerRadius: max(2, 4 * state.scale)).stroke(Color.blue.opacity(0.3), lineWidth: 1))
+                .position(x: x, y: y)
+                .gesture(widgetDragGesture(id: br.id, currentX: br.x, currentY: br.y))
             }
         }
     }
@@ -285,6 +372,23 @@ public struct CanvasWMOverlayView: View {
                 Text("\(state.windows.count) windows")
 
                 Spacer()
+
+                Button(action: { showWidgetGallery.toggle() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus.square")
+                        Text("Add")
+                    }
+                    .font(.system(size: 13))
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.blue)
+                .popover(isPresented: $showWidgetGallery, arrowEdge: .top) {
+                    WMWidgetGalleryView(
+                        state: state,
+                        stickyNoteController: stickyNoteController,
+                        isPresented: $showWidgetGallery
+                    )
+                }
 
                 Button(action: { promptBookmarkName() }) {
                     HStack(spacing: 4) {
@@ -595,6 +699,166 @@ enum BookmarkNamePrompt {
             } else {
                 completion(nil)
             }
+        }
+    }
+}
+
+// MARK: - WM Widget Gallery
+
+struct WMWidgetGalleryItem: Identifiable {
+    let id = UUID()
+    let name: String
+    let icon: String
+    let description: String
+    let kind: WMWidgetKind
+}
+
+enum WMWidgetKind {
+    case stickyNote, markdown, browser
+}
+
+struct WMWidgetGalleryView: View {
+    @Bindable var state: CanvasWMState
+    var stickyNoteController: StickyNoteWindowController?
+    @Binding var isPresented: Bool
+
+    private let items: [WMWidgetGalleryItem] = [
+        WMWidgetGalleryItem(name: "Sticky Note", icon: "note.text", description: "Floating desktop note",
+                            kind: .stickyNote),
+        WMWidgetGalleryItem(name: "Markdown", icon: "doc.richtext", description: "Markdown viewer/editor",
+                            kind: .markdown),
+        WMWidgetGalleryItem(name: "Browser", icon: "globe", description: "Embedded web browser",
+                            kind: .browser),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Add Widget")
+                .font(.headline)
+                .padding(.horizontal, 4)
+
+            ForEach(items) { item in
+                WMWidgetPreviewCard(item: item) {
+                    addWidget(kind: item.kind)
+                    isPresented = false
+                }
+            }
+        }
+        .padding(16)
+        .frame(width: 260)
+    }
+
+    private func addWidget(kind: WMWidgetKind) {
+        let screenFrame = state.primaryScreenFrame
+        let sw = screenFrame.width > 0 ? Double(screenFrame.width) : 1440.0
+        let sh = screenFrame.height > 0 ? Double(screenFrame.height) : 900.0
+        switch kind {
+        case .stickyNote:
+            stickyNoteController?.createNote(viewportX: state.viewportX, viewportY: state.viewportY,
+                                              screenWidth: sw, screenHeight: sh)
+        case .markdown:
+            stickyNoteController?.createMarkdown(viewportX: state.viewportX, viewportY: state.viewportY,
+                                                  screenWidth: sw, screenHeight: sh)
+        case .browser:
+            stickyNoteController?.createBrowser(viewportX: state.viewportX, viewportY: state.viewportY,
+                                                 screenWidth: sw, screenHeight: sh)
+        }
+    }
+}
+
+struct WMWidgetPreviewCard: View {
+    let item: WMWidgetGalleryItem
+    let onTap: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            miniPreview(kind: item.kind)
+                .frame(width: 70, height: 50)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Image(systemName: item.icon)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    Text(item.name)
+                        .font(.system(size: 13, weight: .medium))
+                }
+                Text(item.description)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isHovered ? Color.accentColor.opacity(0.08) : Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(isHovered ? Color.accentColor.opacity(0.4) : Color.gray.opacity(0.2), lineWidth: 1)
+        )
+        .onHover { isHovered = $0 }
+        .onTapGesture { onTap() }
+    }
+
+    @ViewBuilder
+    private func miniPreview(kind: WMWidgetKind) -> some View {
+        switch kind {
+        case .stickyNote:
+            VStack(alignment: .leading, spacing: 1) {
+                HStack {
+                    Text("Note").font(.system(size: 6, weight: .medium)).foregroundColor(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal, 3).padding(.vertical, 1)
+                .background(Color.yellow.opacity(0.3))
+                Text("Hello World!")
+                    .font(.system(size: 6))
+                    .padding(.horizontal, 3)
+                Spacer()
+            }
+            .background(Color(red: 1.0, green: 0.98, blue: 0.8))
+            .cornerRadius(3)
+
+        case .markdown:
+            VStack(alignment: .leading, spacing: 1) {
+                HStack {
+                    Text("Markdown").font(.system(size: 6, weight: .medium)).foregroundColor(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal, 3).padding(.vertical, 1)
+                .background(Color.purple.opacity(0.1))
+                Text("# Title").font(.system(size: 7, weight: .bold))
+                    .padding(.horizontal, 3)
+                Text("Some text...").font(.system(size: 6))
+                    .padding(.horizontal, 3)
+                Spacer()
+            }
+            .background(Color(nsColor: .controlBackgroundColor))
+            .cornerRadius(3)
+
+        case .browser:
+            VStack(spacing: 0) {
+                HStack(spacing: 2) {
+                    Image(systemName: "chevron.left").font(.system(size: 5))
+                    Image(systemName: "chevron.right").font(.system(size: 5))
+                    RoundedRectangle(cornerRadius: 1).fill(Color.gray.opacity(0.2)).frame(height: 8)
+                        .overlay(Text("example.com").font(.system(size: 5)).foregroundColor(.secondary))
+                }
+                .padding(.horizontal, 3).padding(.vertical, 2)
+                .background(.bar)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Example").font(.system(size: 7, weight: .bold))
+                    Text("Web content").font(.system(size: 5)).foregroundColor(.secondary)
+                }
+                .padding(3)
+                Spacer()
+            }
+            .background(Color.white)
+            .cornerRadius(3)
         }
     }
 }

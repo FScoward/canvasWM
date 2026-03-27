@@ -149,3 +149,19 @@ public struct FileManagerWidgetView: View {
         path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
     }
 }
+
+struct FileManagerWidgetView_Previews: PreviewProvider {
+    static var previews: some View {
+        let state = CanvasState()
+        let fm = FileManagerState(id: "preview-1", x: 0, y: 0, width: 400, height: 300,
+                                   rootPath: "~", zIndex: 0)
+        FileManagerWidgetView(fm: fm, isSelected: false, canvasState: state)
+            .previewDisplayName("home dir")
+
+        let state2 = CanvasState()
+        let fm2 = FileManagerState(id: "preview-2", x: 0, y: 0, width: 400, height: 300,
+                                    rootPath: "~/Desktop", zIndex: 0)
+        FileManagerWidgetView(fm: fm2, isSelected: true, canvasState: state2)
+            .previewDisplayName("selected")
+    }
+}

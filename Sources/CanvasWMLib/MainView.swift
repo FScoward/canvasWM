@@ -80,6 +80,7 @@ public struct ToolbarView: View {
     @Binding var showSidebar: Bool
     @Binding var showBookmarks: Bool
     @Binding var showBookmarkNameInput: Bool
+    @State private var showWidgetGallery: Bool = false
 
     public init(canvasState: CanvasState, canvasSize: Binding<CGSize>, showSidebar: Binding<Bool>,
                 showBookmarks: Binding<Bool>, showBookmarkNameInput: Binding<Bool>) {
@@ -97,6 +98,15 @@ public struct ToolbarView: View {
             }.buttonStyle(.plain)
 
             Divider().frame(height: 16)
+
+            Button(action: { showWidgetGallery.toggle() }) {
+                Label("Add", systemImage: "plus.square")
+            }
+            .buttonStyle(.borderedProminent)
+            .popover(isPresented: $showWidgetGallery, arrowEdge: .bottom) {
+                WidgetGalleryView(canvasState: canvasState, canvasSize: canvasSize,
+                                  isPresented: $showWidgetGallery)
+            }
 
             Button(action: { addWidgetAtCenter { canvasState.addStickyNote(x: $0, y: $1) } }) {
                 Label("Note", systemImage: "note.text.badge.plus")

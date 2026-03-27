@@ -44,3 +44,25 @@ public struct StickyNoteView: View {
         .onTapGesture { canvasState.bringToFront(id: note.id) }
     }
 }
+
+struct StickyNoteView_Previews: PreviewProvider {
+    static var previews: some View {
+        let state = CanvasState()
+        let note = StickyNote(id: "preview-1", x: 0, y: 0, width: 300, height: 150,
+                              text: "Hello, this is a preview sticky note!", fontSize: 14, zIndex: 0)
+        StickyNoteView(note: note, isSelected: false, canvasState: state)
+            .previewDisplayName("with text")
+
+        let state2 = CanvasState()
+        let note2 = StickyNote(id: "preview-2", x: 0, y: 0, width: 300, height: 150,
+                               text: "Selected note", fontSize: 14, zIndex: 0)
+        StickyNoteView(note: note2, isSelected: true, canvasState: state2)
+            .previewDisplayName("selected")
+
+        let state3 = CanvasState()
+        let note3 = StickyNote(id: "preview-3", x: 0, y: 0, width: 300, height: 150,
+                               text: "", fontSize: 14, zIndex: 0)
+        StickyNoteView(note: note3, isSelected: false, canvasState: state3)
+            .previewDisplayName("empty")
+    }
+}

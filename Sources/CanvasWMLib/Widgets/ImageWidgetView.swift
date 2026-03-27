@@ -39,7 +39,15 @@ public struct ImageWidgetView: View {
         .onAppear { loadImage() }
     }
 
+    init(imageModel: ImageModel, isSelected: Bool, canvasState: CanvasState, previewImage: NSImage? = nil) {
+        self.imageModel = imageModel
+        self.isSelected = isSelected
+        self.canvasState = canvasState
+        self._nsImage = State(initialValue: previewImage)
+    }
+
     private func loadImage() {
+        guard nsImage == nil else { return }
         if imageModel.src.hasPrefix("/") || imageModel.src.hasPrefix("~") {
             let path = NSString(string: imageModel.src).expandingTildeInPath
             nsImage = NSImage(contentsOfFile: path)
@@ -50,5 +58,31 @@ public struct ImageWidgetView: View {
                 }
             }
         }
+    }
+}
+
+struct ImageWidgetView_Previews: PreviewProvider {
+    static var previews: some View {
+        let state = CanvasState()
+        let img = ImageModel(id: "preview-1", x: 0, y: 0, width: 400, height: 300, src: "", zIndex: 0)
+        let placeholder = NSImage(size: NSSize(width: 400, height: 300), flipped: false) { rect in
+            NSColor.systemBlue.withAlphaComponent(0.3).setFill()
+            rect.fill()
+            let text = "Preview Image" as NSString
+            let attrs: [NSAttributedString.Key: Any] = [
+                .foregroundColor: NSColor.white,
+                .font: NSFont.systemFont(ofSize: 24, weight: .bold)
+            ]
+            let size = text.size(withAttributes: attrs)
+            text.draw(at: NSPoint(x: (rect.width - size.width) / 2, y: (rect.height - size.height) / 2), withAttributes: attrs)
+            return true
+        }
+        ImageWidgetView(imageModel: img, isSelected: false, canvasState: state, previewImage: placeholder)
+            .previewDisplayName("with placeholder")
+
+        let state2 = CanvasState()
+        let img2 = ImageModel(id: "preview-2", x: 0, y: 0, width: 400, height: 300, src: "", zIndex: 0)
+        ImageWidgetView(imageModel: img2, isSelected: false, canvasState: state2)
+            .previewDisplayName("loading")
     }
 }
