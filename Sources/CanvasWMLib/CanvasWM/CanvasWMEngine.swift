@@ -198,10 +198,10 @@ public final class CanvasWMEngine {
 
     // MARK: - Start/stop continuous sync
 
-    public func startSync(interval: TimeInterval = 1.0 / 30.0) {
-        // Skip reverse-sync for the first ~5 frames (~167ms at 30fps) so
+    public func startSync(interval: TimeInterval = 1.0 / 60.0) {
+        // Skip reverse-sync for the first ~10 frames (~167ms at 60fps) so
         // Accessibility API position writes finish before we read back.
-        reverseSyncCooldown = 5
+        reverseSyncCooldown = 10
         syncTimer?.invalidate()
         syncTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             self?.syncToScreen()

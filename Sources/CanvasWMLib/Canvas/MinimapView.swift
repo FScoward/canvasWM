@@ -9,56 +9,74 @@ public struct MinimapView: View {
 
     public var body: some View {
         ZStack {
-            // Background
-            RoundedRectangle(cornerRadius: 4)
-                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.9))
-                .frame(width: minimapWidth, height: minimapHeight)
-
-            // Widget dots
-            ForEach(allWidgetPositions, id: \.id) { widget in
-                Circle()
-                    .fill(widget.color)
-                    .frame(width: 4, height: 4)
-                    .position(x: widget.minimapX, y: widget.minimapY)
-            }
-
-            // Viewport rectangle
-            Rectangle()
-                .stroke(Color.blue.opacity(0.6), lineWidth: 1)
-                .frame(width: viewportWidth, height: viewportHeight)
-                .position(x: viewportCenterX, y: viewportCenterY)
+            minimapBackground
+            widgetRects
+            viewportRect
         }
         .frame(width: minimapWidth, height: minimapHeight)
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.gray.opacity(0.3), lineWidth: 0.5))
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { value in
-                    let ratioX = value.location.x / minimapWidth
-                    let ratioY = value.location.y / minimapHeight
-                    let worldX = (ratioX - 0.5) * worldBoundsWidth
-                    let worldY = (ratioY - 0.5) * worldBoundsHeight
-                    canvasState.panX = -worldX * canvasState.scale + canvasSize.width / 2
-                    canvasState.panY = -worldY * canvasState.scale + canvasSize.height / 2
-                }
-        )
+        .gesture(dragGesture)
+    }
+
+    private var minimapBackground: some View {
+        RoundedRectangle(cornerRadius: 4)
+            .fill(Color(nsColor: .windowBackgroundColor).opacity(0.9))
+            .frame(width: minimapWidth, height: minimapHeight)
+    }
+
+    private var widgetRects: some View {
+        ForEach(allWidgetPositions, id: \.id) { widget in
+            RoundedRectangle(cornerRadius: 1)
+                .fill(widget.color)
+                .frame(width: max(3, widget.minimapW), height: max(2, widget.minimapH))
+                .position(x: widget.minimapX + widget.minimapW / 2,
+                          y: widget.minimapY + widget.minimapH / 2)
+        }
+    }
+
+    private var viewportRect: some View {
+        Rectangle()
+            .stroke(Color.blue.opacity(0.6), lineWidth: 1)
+            .frame(width: viewportWidth, height: viewportHeight)
+            .position(x: viewportCenterX, y: viewportCenterY)
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                let ratioX = value.location.x / minimapWidth
+                let ratioY = value.location.y / minimapHeight
+                let worldX = (ratioX - 0.5) * worldBoundsWidth
+                let worldY = (ratioY - 0.5) * worldBoundsHeight
+                canvasState.panX = -worldX * canvasState.scale + canvasSize.width / 2
+                canvasState.panY = -worldY * canvasState.scale + canvasSize.height / 2
+            }
     }
 
     private struct MinimapWidget: Identifiable {
         let id: String
         let minimapX: Double
         let minimapY: Double
+        let minimapW: Double
+        let minimapH: Double
         let color: Color
+    }
+
+    private func widget(_ id: String, _ x: Double, _ y: Double, _ w: Double, _ h: Double, _ color: Color) -> MinimapWidget {
+        MinimapWidget(id: id, minimapX: toMinimapX(x), minimapY: toMinimapY(y),
+                      minimapW: w / worldBoundsWidth * minimapWidth,
+                      minimapH: h / worldBoundsHeight * minimapHeight, color: color)
     }
 
     private var allWidgetPositions: [MinimapWidget] {
         var widgets: [MinimapWidget] = []
-        for (id, n) in canvasState.stickyNotes { widgets.append(MinimapWidget(id: id, minimapX: toMinimapX(n.x), minimapY: toMinimapY(n.y), color: .yellow)) }
-        for (id, f) in canvasState.frames { widgets.append(MinimapWidget(id: id, minimapX: toMinimapX(f.x), minimapY: toMinimapY(f.y), color: .blue)) }
-        for (id, t) in canvasState.terminals { widgets.append(MinimapWidget(id: id, minimapX: toMinimapX(t.x), minimapY: toMinimapY(t.y), color: .green)) }
-        for (id, b) in canvasState.browsers { widgets.append(MinimapWidget(id: id, minimapX: toMinimapX(b.x), minimapY: toMinimapY(b.y), color: .orange)) }
-        for (id, m) in canvasState.markdowns { widgets.append(MinimapWidget(id: id, minimapX: toMinimapX(m.x), minimapY: toMinimapY(m.y), color: .purple)) }
-        for (id, i) in canvasState.images { widgets.append(MinimapWidget(id: id, minimapX: toMinimapX(i.x), minimapY: toMinimapY(i.y), color: .pink)) }
-        for (id, f) in canvasState.fileManagers { widgets.append(MinimapWidget(id: id, minimapX: toMinimapX(f.x), minimapY: toMinimapY(f.y), color: .orange)) }
+        for (id, n) in canvasState.stickyNotes { widgets.append(widget(id, n.x, n.y, n.width, n.height, .yellow)) }
+        for (id, f) in canvasState.frames { widgets.append(widget(id, f.x, f.y, f.width, f.height, .blue)) }
+        for (id, t) in canvasState.terminals { widgets.append(widget(id, t.x, t.y, t.width, t.height, .green)) }
+        for (id, b) in canvasState.browsers { widgets.append(widget(id, b.x, b.y, b.width, b.height, .orange)) }
+        for (id, m) in canvasState.markdowns { widgets.append(widget(id, m.x, m.y, m.width, m.height, .purple)) }
+        for (id, i) in canvasState.images { widgets.append(widget(id, i.x, i.y, i.width, i.height, .pink)) }
+        for (id, f) in canvasState.fileManagers { widgets.append(widget(id, f.x, f.y, f.width, f.height, .orange)) }
         return widgets
     }
 
