@@ -50,6 +50,7 @@ public struct CanvasWMOverlayView: View {
             // Scroll zoom is handled by NSEvent monitor in CanvasWMWindowController
             .onAppear {
                 state.autoFit(minimapSize: geometry.size)
+                state.centerOnMonitor(minimapSize: geometry.size)
             }
         }
     }

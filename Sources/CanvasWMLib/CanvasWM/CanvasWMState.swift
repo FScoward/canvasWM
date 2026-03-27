@@ -182,4 +182,14 @@ public final class CanvasWMState {
         panX = padding - minX * scale + (availW - contentW * scale) / 2
         panY = padding - minY * scale + (availH - contentH * scale) / 2
     }
+
+    /// Shift pan so the monitor viewport is centered in the minimap (call after autoFit)
+    public func centerOnMonitor(minimapSize: CGSize) {
+        let monitorCenterX = viewportX + primaryScreenFrame.width / 2
+        let monitorCenterY = viewportY + primaryScreenFrame.height / 2
+        let targetPanX = Double(minimapSize.width) / 2 - monitorCenterX * scale
+        let targetPanY = Double(minimapSize.height) / 2 - monitorCenterY * scale
+        panX = targetPanX
+        panY = targetPanY
+    }
 }

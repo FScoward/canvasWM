@@ -77,6 +77,7 @@ public final class CanvasWMWindowController {
             engine.captureAndPlaceWindows()
             engine.captureAllThumbnails()
             wmState.autoFit(minimapSize: Self.minimapSize)
+            wmState.centerOnMonitor(minimapSize: Self.minimapSize)
             createMinimapWindow()
         }
         minimapWindow?.alphaValue = 1.0
@@ -134,6 +135,7 @@ public final class CanvasWMWindowController {
         engine.captureAllThumbnails()
         if let size = minimapWindow?.frame.size {
             wmState.autoFit(minimapSize: size)
+            wmState.centerOnMonitor(minimapSize: size)
         }
         // Show with fade-in
         minimapWindow?.alphaValue = 0
@@ -343,6 +345,7 @@ public final class CanvasWMWindowController {
                 self.engine.captureAllThumbnails()
                 if let size = self.minimapWindow?.frame.size {
                     self.wmState.autoFit(minimapSize: size)
+                    self.wmState.centerOnMonitor(minimapSize: size)
                 }
                 self.engine.syncToScreen()
                 return nil
