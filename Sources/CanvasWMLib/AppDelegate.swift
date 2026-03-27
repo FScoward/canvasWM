@@ -10,6 +10,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     public func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBarIcon()
         mainWindow = NSApplication.shared.windows.first
+        // Hide the canvas window on startup
+        mainWindow?.orderOut(nil)
         wmController.stickyNoteController = stickyNoteController
         stickyNoteController.restoreAllWindows()
         // Prepare canvas WM (hidden) — minimap appears on Option+Control hold
