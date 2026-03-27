@@ -177,7 +177,7 @@ public final class CanvasWMState {
 
         let availW = Double(minimapSize.width) - padding * 2
         let availH = Double(minimapSize.height) - padding * 2
-        scale = min(availW / contentW, availH / contentH, 0.5)
+        scale = min(availW / contentW, availH / contentH, 0.3)
 
         panX = padding - minX * scale + (availW - contentW * scale) / 2
         panY = padding - minY * scale + (availH - contentH * scale) / 2

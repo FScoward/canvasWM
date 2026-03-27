@@ -4,8 +4,8 @@ public struct MinimapView: View {
     @Bindable var canvasState: CanvasState
     let canvasSize: CGSize
 
-    private let minimapWidth: Double = 150
-    private let minimapHeight: Double = 100
+    private let minimapWidth: Double = 120
+    private let minimapHeight: Double = 80
 
     public var body: some View {
         ZStack {

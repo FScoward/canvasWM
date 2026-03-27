@@ -29,7 +29,7 @@ public final class CanvasWMWindowController {
     private static let minimapSize: CGSize = {
         guard let screen = NSScreen.main else { return CGSize(width: 1600, height: 1000) }
         let f = screen.visibleFrame
-        return CGSize(width: f.width * 0.85, height: f.height * 0.85)
+        return CGSize(width: f.width * 0.65, height: f.height * 0.65)
     }()
 
     /// Required modifier flags to show the minimap: Option + Control
