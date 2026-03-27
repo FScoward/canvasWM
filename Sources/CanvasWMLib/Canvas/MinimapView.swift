@@ -11,6 +11,7 @@ public struct MinimapView: View {
         ZStack {
             minimapBackground
             widgetRects
+            bookmarkMarkers
             viewportRect
         }
         .frame(width: minimapWidth, height: minimapHeight)
@@ -78,6 +79,40 @@ public struct MinimapView: View {
         for (id, i) in canvasState.images { widgets.append(widget(id, i.x, i.y, i.width, i.height, .pink)) }
         for (id, f) in canvasState.fileManagers { widgets.append(widget(id, f.x, f.y, f.width, f.height, .orange)) }
         return widgets
+    }
+
+    private var bookmarkMarkers: some View {
+        let areas = canvasState.bookmarkedAreas.values.sorted(by: { $0.createdAt < $1.createdAt })
+        return ForEach(areas) { area in
+            // Bookmark panX/panY are the canvas pan values at save time
+            // Convert to world center: worldX = (-panX + canvasSize.width/2) / scale
+            let worldCenterX = (-area.panX + canvasSize.width / 2) / area.scale
+            let worldCenterY = (-area.panY + canvasSize.height / 2) / area.scale
+            let mx = toMinimapX(worldCenterX)
+            let my = toMinimapY(worldCenterY)
+            // Viewport size at that bookmark's scale
+            let bw = (canvasSize.width / area.scale) / worldBoundsWidth * minimapWidth
+            let bh = (canvasSize.height / area.scale) / worldBoundsHeight * minimapHeight
+            ZStack {
+                Rectangle()
+                    .fill(Color.orange.opacity(0.1))
+                    .frame(width: bw, height: bh)
+                Rectangle()
+                    .stroke(Color.orange, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+                    .frame(width: bw, height: bh)
+                VStack(spacing: 0) {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 6))
+                    Text(area.name)
+                        .font(.system(size: 5, weight: .bold))
+                        .lineLimit(1)
+                }
+                .foregroundColor(.orange)
+                .shadow(color: .black.opacity(0.6), radius: 1)
+                .offset(y: -bh / 2 - 5)
+            }
+            .position(x: mx, y: my)
+        }
     }
 
     private var worldBoundsWidth: Double { max(canvasSize.width * 3, 3000) }

@@ -22,6 +22,7 @@ public struct CanvasWMOverlayView: View {
         GeometryReader { geometry in
             ZStack {
                 canvasGrid
+                bookmarkAreasLayer
                 monitorBounds(screenSize: geometry.size)
                 windowsLayer
                 stickyNotesLayer
@@ -70,6 +71,8 @@ public struct CanvasWMOverlayView: View {
     }
 
     @State private var viewportDragStart: CGPoint? = nil
+    @State private var monitorGlow: Bool = false
+    @State private var monitorGradientAngle: Double = 0
 
     private func monitorBounds(screenSize: CGSize) -> some View {
         let fullScreen = state.primaryScreenFrame.width > 0 ? state.primaryScreenFrame.size : screenSize
@@ -77,19 +80,49 @@ public struct CanvasWMOverlayView: View {
         let h = fullScreen.height * state.scale
         let x = state.viewportX * state.scale + state.panX
         let y = state.viewportY * state.scale + state.panY
+        let monitorColor = Color(red: 0.2, green: 0.6, blue: 1.0) // bright blue
         return ZStack {
+            // Background fill
             Rectangle()
-                .fill(Color.blue.opacity(0.08))
+                .fill(monitorColor.opacity(monitorGlow ? 0.15 : 0.05))
                 .frame(width: w, height: h)
                 .position(x: x + w / 2, y: y + h / 2)
+            // Pattern B: Rotating angular gradient border
             Rectangle()
-                .stroke(Color.blue.opacity(0.7), style: StrokeStyle(lineWidth: 2, dash: [6, 3]))
+                .stroke(
+                    AngularGradient(
+                        gradient: Gradient(colors: [
+                            monitorColor,
+                            .cyan,
+                            .white,
+                            .cyan,
+                            monitorColor,
+                            monitorColor.opacity(0.2),
+                            monitorColor.opacity(0.2),
+                            monitorColor
+                        ]),
+                        center: .center,
+                        angle: .degrees(monitorGradientAngle)
+                    ),
+                    lineWidth: 3.5
+                )
                 .frame(width: w, height: h)
                 .position(x: x + w / 2, y: y + h / 2)
+                .shadow(color: monitorColor.opacity(0.7), radius: 10)
+            // Label
             Text("Monitor")
-                .font(.system(size: 9, weight: .medium, design: .monospaced))
-                .foregroundColor(.blue.opacity(0.8))
-                .position(x: x + w / 2, y: y + 10)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundColor(monitorColor)
+                .shadow(color: monitorColor.opacity(0.8), radius: 6)
+                .position(x: x + w / 2, y: y + 12)
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                monitorGlow = true
+            }
+            withAnimation(.linear(duration: 3.0).repeatForever(autoreverses: false)) {
+                monitorGradientAngle = 360
+            }
         }
         .gesture(
             DragGesture(minimumDistance: 3)
@@ -177,6 +210,45 @@ public struct CanvasWMOverlayView: View {
                     .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.orange.opacity(0.7), lineWidth: 1.5))
                     .position(x: x, y: y)
                     .gesture(widgetDragGesture(id: br.id, currentX: br.x, currentY: br.y))
+            }
+        }
+    }
+
+    private var bookmarkAreasLayer: some View {
+        let screenFrame = state.primaryScreenFrame
+        let screenW = screenFrame.width > 0 ? Double(screenFrame.width) : 1440.0
+        let screenH = screenFrame.height > 0 ? Double(screenFrame.height) : 900.0
+        let areas = state.bookmarkedAreas.values.sorted(by: { $0.createdAt < $1.createdAt })
+        return ForEach(areas) { area in
+            let w = screenW * state.scale
+            let h = screenH * state.scale
+            let x = area.panX * state.scale + state.panX
+            let y = area.panY * state.scale + state.panY
+            ZStack(alignment: .topLeading) {
+                Rectangle()
+                    .fill(Color.orange.opacity(0.08))
+                    .frame(width: w, height: h)
+                Rectangle()
+                    .stroke(Color.orange, style: StrokeStyle(lineWidth: 2.5, dash: [8, 4]))
+                    .frame(width: w, height: h)
+                    .shadow(color: Color.orange.opacity(0.4), radius: 4)
+                HStack(spacing: 3) {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 11))
+                    Text(area.name)
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                }
+                .foregroundColor(.orange)
+                .shadow(color: .orange.opacity(0.6), radius: 3)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(Color.black.opacity(0.7))
+                .cornerRadius(4)
+                .offset(x: 4, y: 4)
+            }
+            .position(x: x + w / 2, y: y + h / 2)
+            .onTapGesture {
+                state.jumpToArea(id: area.id, engine: engine)
             }
         }
     }
