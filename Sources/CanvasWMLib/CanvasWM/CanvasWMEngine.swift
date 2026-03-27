@@ -17,8 +17,12 @@ public final class CanvasWMEngine {
     public var isDragging: Bool = false
     /// When true, suppress user-move detection for floating widgets (minimap is showing)
     public var isMinimapShowing: Bool = false
-    /// Frames to skip reverse sync after startSync to avoid false user-move detection
+    /// Frames to skip reverse sync after startSync or viewport movement to avoid
+    /// false user-move detection (Accessibility API moves are async)
     private var reverseSyncCooldown: Int = 0
+    /// Last viewport position used to detect viewport movement in syncToScreen
+    private var lastSyncViewportX: Double = 0
+    private var lastSyncViewportY: Double = 0
 
     /// Directory and file for external notification triggers
     private static let notifyDir: URL = {
@@ -106,6 +110,15 @@ public final class CanvasWMEngine {
         isArranging = true
         defer { isArranging = false }
 
+        // Detect viewport movement and extend cooldown so reverse sync
+        // doesn't fire while Accessibility API is still finishing async moves
+        let vpDx = abs(state.viewportX - lastSyncViewportX)
+        let vpDy = abs(state.viewportY - lastSyncViewportY)
+        if vpDx > 0.5 || vpDy > 0.5 {
+            reverseSyncCooldown = max(reverseSyncCooldown, 5)
+            lastSyncViewportX = state.viewportX
+            lastSyncViewportY = state.viewportY
+        }
         if reverseSyncCooldown > 0 { reverseSyncCooldown -= 1 }
 
         let screen = state.primaryVisibleFrame
@@ -128,8 +141,16 @@ public final class CanvasWMEngine {
                    abs(targetPos.x - last.x) < 1 && abs(targetPos.y - last.y) < 1,
                    last.x < 90000 {
                     // Skip reverse sync during cooldown to avoid false detection
-                    // right after startSync (Accessibility API moves are async).
+                    // right after startSync or viewport movement (Accessibility API moves are async).
                     if reverseSyncCooldown > 0 { continue }
+                    // Skip reverse sync if last applied position was outside visible screen area.
+                    // macOS won't actually place a window at large negative coordinates (e.g. y=-1477)
+                    // and will clamp it to the menu bar (~y=25). Reading back the clamped position
+                    // would be falsely interpreted as a user-initiated move.
+                    if Double(last.x) < -50 || Double(last.y) < -50 ||
+                       Double(last.x) > screenSize.w + 50 || Double(last.y) > screenSize.h + 50 {
+                        continue
+                    }
                     // Target unchanged — detect user-initiated moves and sync to canvas
                     if let actual = windowCapture.getWindowPosition(pid: pid, windowTitle: win.windowTitle, windowId: win.windowId.map { CGWindowID($0) }) {
                         let actualX = Double(actual.position.x)
