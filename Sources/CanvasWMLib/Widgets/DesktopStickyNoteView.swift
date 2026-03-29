@@ -42,6 +42,7 @@ struct DesktopStickyNoteView: View {
         HStack(spacing: 6) {
             colorDots
             Spacer()
+                .overlay(WindowDragAreaView())
             Button(action: onDelete) {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))
@@ -52,7 +53,6 @@ struct DesktopStickyNoteView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(titleBgColor.opacity(0.8))
-        .overlay(WindowDragAreaView())
     }
 
     private var colorDots: some View {
