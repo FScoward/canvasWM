@@ -3,7 +3,6 @@ import AppKit
 public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     public var onTerminate: (() -> Void)?
-    private var mainWindow: NSWindow?
     public let wmController = CanvasWMWindowController()
     public let stickyNoteController = StickyNoteWindowController()
 
@@ -14,9 +13,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         // Register default: gather windows on quit is ON by default
         UserDefaults.standard.register(defaults: [Self.gatherOnQuitKey: true])
         setupMenuBarIcon()
-        mainWindow = NSApplication.shared.windows.first
-        // Hide the canvas window on startup
-        mainWindow?.orderOut(nil)
         wmController.stickyNoteController = stickyNoteController
         stickyNoteController.restoreAllWindows()
         // Prepare canvas WM (hidden) — minimap appears on Option+Control hold
@@ -43,8 +39,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Show Canvas", action: #selector(showCanvas), keyEquivalent: ""))
-        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "New Sticky Note", action: #selector(newStickyNote), keyEquivalent: "n"))
         menu.addItem(NSMenuItem(title: "New Markdown", action: #selector(newMarkdown), keyEquivalent: "m"))
         menu.addItem(NSMenuItem(title: "New Browser", action: #selector(newBrowser), keyEquivalent: "b"))
@@ -57,12 +51,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem?.menu = menu
-    }
-
-    @objc private func showCanvas() {
-        guard let window = mainWindow ?? NSApplication.shared.windows.first else { return }
-        window.makeKeyAndOrderFront(nil)
-        NSApplication.shared.activate(ignoringOtherApps: true)
     }
 
     @objc private func newStickyNote() {

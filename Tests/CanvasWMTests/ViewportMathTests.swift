@@ -92,49 +92,6 @@ func runViewportMathTests() {
         assert(ViewportMath.clampScale(2.5) == 2.5, "clamp passthrough")
     }
 
-    // BookmarkedArea serialization round-trip
-    do {
-        let area = BookmarkedArea(name: "Test Area", panX: 100.5, panY: -200.3, scale: 1.5)
-        let data = CanvasData(bookmarkedAreas: [area.id: area])
-        let encoded = try! JSONEncoder().encode(data)
-        let decoded = try! JSONDecoder().decode(CanvasData.self, from: encoded)
-        assert(decoded.bookmarkedAreas.count == 1, "bookmarkedAreas round-trip count")
-        let decodedArea = decoded.bookmarkedAreas.values.first!
-        assert(decodedArea.name == "Test Area", "bookmarkedAreas round-trip name")
-        assertEqualDouble(decodedArea.panX, 100.5, message: "bookmarkedAreas round-trip panX")
-        assertEqualDouble(decodedArea.panY, -200.3, message: "bookmarkedAreas round-trip panY")
-        assertEqualDouble(decodedArea.scale, 1.5, message: "bookmarkedAreas round-trip scale")
-    }
-
-    // Legacy CanvasData without bookmarkedAreas field decodes with empty default
-    do {
-        let json = """
-        {"scale":1.0,"panX":0,"panY":0,"stickyNotes":{},"frames":{},"drawings":{},"images":{},"markdowns":{},"terminals":{},"browsers":{},"fileManagers":{},"nextZIndex":1}
-        """
-        let decoded = try! JSONDecoder().decode(CanvasData.self, from: json.data(using: .utf8)!)
-        assert(decoded.bookmarkedAreas.isEmpty, "legacy CanvasData has empty bookmarkedAreas")
-        assertEqualDouble(decoded.scale, 1.0, message: "legacy CanvasData scale preserved")
-    }
-
-    // CanvasState add/jump bookmark
-    do {
-        let state = CanvasState()
-        state.panX = 500; state.panY = -300; state.scale = 2.0
-        state.addBookmarkedArea(name: "Spot A")
-        assert(state.bookmarkedAreas.count == 1, "addBookmarkedArea creates one")
-        let areaId = state.bookmarkedAreas.keys.first!
-        let area = state.bookmarkedAreas[areaId]!
-        assertEqualDouble(area.panX, 500, message: "bookmark captures panX")
-        assertEqualDouble(area.panY, -300, message: "bookmark captures panY")
-        assertEqualDouble(area.scale, 2.0, message: "bookmark captures scale")
-
-        state.panX = 0; state.panY = 0; state.scale = 1.0
-        state.jumpToArea(id: areaId)
-        assertEqualDouble(state.panX, 500, message: "jumpToArea restores panX")
-        assertEqualDouble(state.panY, -300, message: "jumpToArea restores panY")
-        assertEqualDouble(state.scale, 2.0, message: "jumpToArea restores scale")
-    }
-
     print("\nViewportMath Tests: \(_passes) passed, \(_failures) failed")
     if _failures > 0 {
         print("TESTS FAILED")

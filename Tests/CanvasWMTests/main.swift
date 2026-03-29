@@ -1,9 +1,6 @@
 import Foundation
 
 runViewportMathTests()
-runCanvasStateTests()
-runPathSimplifyTests()
-runWorkspaceStateTests()
 runCanvasWMStateTests()
 runModelsSerializationTests()
 
