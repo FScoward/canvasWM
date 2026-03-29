@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CanvasWM is a macOS native spatial window manager built with Swift and SwiftUI. It captures real macOS windows onto an infinite canvas minimap, enabling spatial window arrangement. Activated via Option+Control toggle or Ctrl+T for persistent mode. Uses Accessibility API to move/resize real windows based on canvas viewport position.
+CanvasWM is a macOS native spatial window manager built with Swift and SwiftUI. It captures real macOS windows onto an infinite canvas minimap, enabling spatial window arrangement. Activated via Option+Control toggle or menu bar toggle for persistent mode. Uses Accessibility API to move/resize real windows based on canvas viewport position.
 
 Additionally, it provides floating desktop widgets (sticky notes, markdown editors, browsers) that sync with the viewport.
 
