@@ -72,11 +72,19 @@ public final class CanvasWMEngine {
             )
         }
 
-        // Update titles for existing windows so fallback matching stays in sync
+        // Update titles and sizes for existing windows so they stay in sync
         let liveWindowMap = Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) })
         for (id, managed) in state.windows {
-            if let wid = managed.windowId, let live = liveWindowMap[wid], live.title != managed.windowTitle {
-                state.windows[id]?.windowTitle = live.title
+            if let wid = managed.windowId, let live = liveWindowMap[wid] {
+                if live.title != managed.windowTitle {
+                    state.windows[id]?.windowTitle = live.title
+                }
+                let liveW = Double(live.bounds.width)
+                let liveH = Double(live.bounds.height)
+                if abs(managed.width - liveW) > 1 || abs(managed.height - liveH) > 1 {
+                    state.windows[id]?.width = liveW
+                    state.windows[id]?.height = liveH
+                }
             }
         }
 
@@ -151,17 +159,25 @@ public final class CanvasWMEngine {
                        Double(last.x) > screenSize.w + 50 || Double(last.y) > screenSize.h + 50 {
                         continue
                     }
-                    // Target unchanged — detect user-initiated moves and sync to canvas
+                    // Target unchanged — detect user-initiated moves/resizes and sync to canvas
                     if let actual = windowCapture.getWindowPosition(pid: pid, windowTitle: win.windowTitle, windowId: win.windowId.map { CGWindowID($0) }) {
                         let actualX = Double(actual.position.x)
                         let actualY = Double(actual.position.y)
+                        let actualW = Double(actual.size.width)
+                        let actualH = Double(actual.size.height)
                         let dx = abs(actualX - Double(last.x))
                         let dy = abs(actualY - Double(last.y))
+                        let dw = abs(actualW - win.width)
+                        let dh = abs(actualH - win.height)
                         if dx > 5 || dy > 5 {
                             let newCanvasX = actualX + state.viewportX
                             let newCanvasY = actualY + state.viewportY
                             state.moveWindow(id: win.id, x: newCanvasX, y: newCanvasY)
                             lastAppliedPositions[win.id] = CGPoint(x: actualX, y: actualY)
+                        }
+                        if dw > 3 || dh > 3 {
+                            state.windows[win.id]?.width = actualW
+                            state.windows[win.id]?.height = actualH
                         }
                     }
                     continue
