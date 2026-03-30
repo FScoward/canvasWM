@@ -24,6 +24,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     public func applicationShouldTerminateAfterLastWindowClosed(_ app: NSApplication) -> Bool { false }
 
     public func applicationWillTerminate(_ notification: Notification) {
+        stickyNoteController.saveNow()
         if UserDefaults.standard.bool(forKey: Self.gatherOnQuitKey) {
             wmController.gatherWindowsToMonitor()
         }

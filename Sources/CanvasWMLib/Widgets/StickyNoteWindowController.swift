@@ -113,17 +113,17 @@ public final class StickyNoteWindowController {
                 continue
             }
 
-            // Get model height and current canvas coords
-            var h: Double = Double(frame.height)
+            // Get current canvas coords; use frame height (includes title bar) for Y-flip
+            let frameH = Double(frame.height)
             var curCanvasX: Double = 0, curCanvasY: Double = 0
-            if let note = notes[id] { h = note.height; curCanvasX = note.x; curCanvasY = note.y }
-            else if let md = markdowns[id] { h = md.height; curCanvasX = md.x; curCanvasY = md.y }
-            else if let br = browsers[id] { h = br.height; curCanvasX = br.x; curCanvasY = br.y }
+            if let note = notes[id] { curCanvasX = note.x; curCanvasY = note.y }
+            else if let md = markdowns[id] { curCanvasX = md.x; curCanvasY = md.y }
+            else if let br = browsers[id] { curCanvasX = br.x; curCanvasY = br.y }
             else { continue }
 
             // Check if panel is at the position canvas coords predict
             let expectedScreenX = curCanvasX - viewportX
-            let expectedFlippedY = Double(screenFrame.height) - (curCanvasY - viewportY) - h + Double(screenFrame.minY)
+            let expectedFlippedY = Double(screenFrame.height) - (curCanvasY - viewportY) - frameH + Double(screenFrame.minY)
             let dx = abs(fx - expectedScreenX)
             let dy = abs(fy - expectedFlippedY)
 
@@ -132,7 +132,7 @@ public final class StickyNoteWindowController {
             }
 
             // Panel is on-screen but doesn't match canvas coords — recapture
-            let screenY = screenH - fy - h + Double(screenFrame.minY)
+            let screenY = screenH - fy - frameH + Double(screenFrame.minY)
             let canvasX = fx + viewportX
             let canvasY = screenY + viewportY
             if notes[id] != nil { notes[id]?.x = canvasX; notes[id]?.y = canvasY }
@@ -183,14 +183,15 @@ public final class StickyNoteWindowController {
         // Detect user-initiated move: compare actual panel position with last applied
         // Skip when viewport is moving to avoid false positives from programmatic repositioning
         let actualFrame = panel.frame
+        let frameH = Double(actualFrame.size.height)  // Use frame height (includes title bar) for Y-flip
         if !skipUserMoveDetection, let lastFrame = lastAppliedFrames[id] {
             let dx = abs(actualFrame.origin.x - lastFrame.origin.x)
             let dy = abs(actualFrame.origin.y - lastFrame.origin.y)
             if dx > 3 || dy > 3 {
                 // User moved the panel — convert screen position back to canvas coords
                 let screenX = Double(actualFrame.origin.x)
-                // Flip Y back from bottom-left to top-left
-                let screenY = Double(screenFrame.height) - Double(actualFrame.origin.y) - h + Double(screenFrame.minY)
+                // Flip Y back from bottom-left to top-left (use frame height for correct flip)
+                let screenY = Double(screenFrame.height) - Double(actualFrame.origin.y) - frameH + Double(screenFrame.minY)
                 let newCanvasX = screenX + viewportX
                 let newCanvasY = screenY + viewportY
                 // Update the appropriate model
@@ -209,7 +210,7 @@ public final class StickyNoteWindowController {
                       screenY + h > -100 && screenY < Double(screenFrame.height) + 100
 
         if visible {
-            let flippedY = Double(screenFrame.height) - screenY - h + Double(screenFrame.minY)
+            let flippedY = Double(screenFrame.height) - screenY - frameH + Double(screenFrame.minY)
             // Only update position, preserve panel's current size (frame includes title bar)
             let cur = panel.frame
             if abs(screenX - Double(cur.origin.x)) > 1
@@ -336,8 +337,10 @@ public final class StickyNoteWindowController {
 
     private func syncWindowSize(id: String, panel: NSPanel) {
         guard !isSyncing else { return }
-        let frame = panel.frame
-        let w = Double(frame.width), h = Double(frame.height)
+        // Use content rect size (excludes title bar) so that makePanel(contentRect:)
+        // restores the exact same dimensions on next launch.
+        let contentSize = panel.contentRect(forFrameRect: panel.frame).size
+        let w = Double(contentSize.width), h = Double(contentSize.height)
         if notes[id] != nil { notes[id]?.width = w; notes[id]?.height = h }
         if markdowns[id] != nil { markdowns[id]?.width = w; markdowns[id]?.height = h }
         if browsers[id] != nil { browsers[id]?.width = w; browsers[id]?.height = h }
@@ -345,6 +348,12 @@ public final class StickyNoteWindowController {
     }
 
     // MARK: - Persistence
+
+    /// Flush pending changes to disk immediately (call on app termination).
+    public func saveNow() {
+        saveTask?.cancel()
+        saveAll()
+    }
 
     private func scheduleSave() {
         saveTask?.cancel()
