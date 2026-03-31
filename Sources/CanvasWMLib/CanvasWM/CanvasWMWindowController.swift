@@ -12,6 +12,8 @@ public final class CanvasWMWindowController {
     private var flagsMonitor: Any?
     private var globalFlagsMonitor: Any?
     private var mouseTrackMonitor: Any?
+    private var focusKeyEventTap: CFMachPort?
+    private var focusKeyRunLoopSource: CFRunLoopSource?
     private var inactivityTimer: Timer?
     private var activityMonitors: [Any] = []
     /// Seconds of inactivity before auto-hiding the minimap
@@ -58,6 +60,7 @@ public final class CanvasWMWindowController {
         minimapWindow?.alphaValue = 0
         minimapWindow?.orderOut(nil)
         registerFlagsMonitors()
+        registerFocusKeyMonitor()
     }
 
     // MARK: - Persistent mode (Ctrl+T toggle)
@@ -108,6 +111,7 @@ public final class CanvasWMWindowController {
     /// Clean up all monitors (call on app termination)
     public func cleanup() {
         unregisterFlagsMonitors()
+        unregisterFocusKeyMonitor()
         fadeOutWork?.cancel()
         fadeOutWork = nil
     }
@@ -266,6 +270,95 @@ public final class CanvasWMWindowController {
         if let m = globalFlagsMonitor { NSEvent.removeMonitor(m); globalFlagsMonitor = nil }
     }
 
+    // MARK: - Focus key shortcut (Cmd+Control+Enter → center on focused window)
+
+    /// Register a CGEvent tap to intercept Cmd+Control+Enter globally,
+    /// even when apps like iTerm2 consume the key event.
+    private func registerFocusKeyMonitor() {
+        let mask: CGEventMask = (1 << CGEventType.keyDown.rawValue)
+        let refcon = Unmanaged.passUnretained(self).toOpaque()
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: mask,
+            callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
+                guard let refcon else { return Unmanaged.passUnretained(event) }
+                let controller = Unmanaged<CanvasWMWindowController>.fromOpaque(refcon).takeUnretainedValue()
+                // Re-enable tap if the system disabled it
+                if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                    if let tap = controller.focusKeyEventTap {
+                        CGEvent.tapEnable(tap: tap, enable: true)
+                    }
+                    return Unmanaged.passUnretained(event)
+                }
+                let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+                let flags = event.flags
+                let isCmd = flags.contains(.maskCommand)
+                let isCtrl = flags.contains(.maskControl)
+                let isEnter = keyCode == 36
+                if isCmd && isCtrl && isEnter {
+                    DispatchQueue.main.async { controller.centerOnFocusedWindow() }
+                    return nil  // consume the event
+                }
+                return Unmanaged.passUnretained(event)
+            },
+            userInfo: refcon
+        ) else {
+            print("[FocusKey] Failed to create CGEvent tap (accessibility permission needed)")
+            return
+        }
+        focusKeyEventTap = tap
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        focusKeyRunLoopSource = source
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+    }
+
+    private func unregisterFocusKeyMonitor() {
+        if let tap = focusKeyEventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            focusKeyEventTap = nil
+        }
+        if let source = focusKeyRunLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
+            focusKeyRunLoopSource = nil
+        }
+    }
+
+    /// Find the frontmost window and center the viewport on it.
+    private func centerOnFocusedWindow() {
+        guard let frontApp = NSWorkspace.shared.frontmostApplication else { return }
+        let pid = frontApp.processIdentifier
+
+        // Get the frontmost window of this app via CGWindowList
+        guard let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return }
+
+        // Find the first on-screen window matching this PID
+        var targetWindowId: UInt32?
+        for info in windowList {
+            guard let ownerPid = info[kCGWindowOwnerPID as String] as? Int32,
+                  ownerPid == pid,
+                  let wid = info[kCGWindowNumber as String] as? UInt32,
+                  let layer = info[kCGWindowLayer as String] as? Int,
+                  layer == 0 else { continue }  // layer 0 = normal windows
+            targetWindowId = wid
+            break
+        }
+
+        guard let wid = targetWindowId else { return }
+
+        // Match to a ManagedWindow
+        guard let win = wmState.windows.values.first(where: { $0.windowId == wid }) else { return }
+
+        let frame = wmState.primaryScreenFrame
+        guard frame.width > 0 else { return }
+        let screenSize = (w: Double(frame.width), h: Double(frame.height))
+        wmState.centerViewport(on: win, screenSize: screenSize)
+        wmState.bringToFront(id: win.id)
+        engine.syncToScreen()
+    }
+
     private func createMinimapWindow() {
         let size = Self.minimapSize
         // Position in bottom-right corner of main screen
@@ -368,7 +461,7 @@ public final class CanvasWMWindowController {
         scrollMonitor = nil; keyMonitor = nil; globalKeyMonitor = nil
     }
 
-    deinit { deactivate(); unregisterFlagsMonitors(); stopMouseTracking(); stopInactivityTimer() }
+    deinit { deactivate(); unregisterFlagsMonitors(); unregisterFocusKeyMonitor(); stopMouseTracking(); stopInactivityTimer() }
 }
 
 // Custom window that strips modifier flags from mouse events so SwiftUI
