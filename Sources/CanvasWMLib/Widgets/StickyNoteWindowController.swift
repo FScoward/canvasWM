@@ -211,23 +211,20 @@ public final class StickyNoteWindowController {
 
         if visible {
             let flippedY = Double(screenFrame.height) - screenY - frameH + Double(screenFrame.minY)
-            // Only update position, preserve panel's current size (frame includes title bar)
+            let newOrigin = CGPoint(x: screenX, y: flippedY)
             let cur = panel.frame
             if abs(screenX - Double(cur.origin.x)) > 1
                 || abs(flippedY - Double(cur.origin.y)) > 1 {
-                var newFrame = cur
-                newFrame.origin = CGPoint(x: screenX, y: flippedY)
-                panel.setFrame(newFrame, display: true)
-                lastAppliedFrames[id] = newFrame
+                // Use setFrameOrigin to move without allowing macOS to constrain/resize
+                panel.setFrameOrigin(newOrigin)
+                lastAppliedFrames[id] = panel.frame
             }
             panel.orderFront(nil)
         } else {
             let cur = panel.frame
             if cur.origin.x != -10000 || cur.origin.y != -10000 {
-                var offFrame = cur
-                offFrame.origin = CGPoint(x: -10000, y: -10000)
-                panel.setFrame(offFrame, display: false)
-                lastAppliedFrames[id] = offFrame
+                panel.setFrameOrigin(CGPoint(x: -10000, y: -10000))
+                lastAppliedFrames[id] = panel.frame
             }
         }
     }
