@@ -46,6 +46,10 @@ Bidirectional sync between canvas and real macOS windows at 60fps:
 - Periodic recapture (every 3s) detects new/closed windows
 - External notification via `~/.canvaswm/notify` file (write app name to highlight matching windows)
 
+### Focus Key Shortcut
+
+`Cmd + Control + Enter` centers the viewport on the currently focused macOS window without opening the minimap. Uses a CGEvent tap registered in `CanvasWMWindowController.registerFocusKeyMonitor()`. Does not work in apps with Secure Keyboard Entry enabled (e.g. iTerm2).
+
 ### Floating Desktop Widgets
 
 `StickyNoteWindowController` manages floating NSWindows (sticky notes, markdown, browser) as independent desktop windows. These sync with `CanvasWMEngine` viewport position.
