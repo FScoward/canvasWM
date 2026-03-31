@@ -5,6 +5,38 @@ public final class WindowCapture {
     public static let shared = WindowCapture()
     private init() {}
 
+    // MARK: - Per-frame cache (call beginFrame/endFrame around sync loops)
+
+    private var frameWindowList: [[String: Any]]?
+    private var frameAXWindows: [pid_t: [AXUIElement]] = [:]
+
+    /// Call at the start of a sync frame to cache expensive system queries
+    public func beginFrame() {
+        frameWindowList = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]]
+        frameAXWindows.removeAll()
+    }
+
+    /// Call at the end of a sync frame to release cache
+    public func endFrame() {
+        frameWindowList = nil
+        frameAXWindows.removeAll()
+    }
+
+    private func getCachedWindowList() -> [[String: Any]] {
+        if let cached = frameWindowList { return cached }
+        return CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] ?? []
+    }
+
+    private func getCachedAXWindows(pid: pid_t) -> [AXUIElement]? {
+        if let cached = frameAXWindows[pid] { return cached }
+        let app = AXUIElementCreateApplication(pid)
+        var windowsRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &windowsRef) == .success,
+              let windows = windowsRef as? [AXUIElement] else { return nil }
+        frameAXWindows[pid] = windows
+        return windows
+    }
+
     public struct WindowInfo {
         public let id: CGWindowID
         public let ownerName: String
@@ -77,10 +109,7 @@ public final class WindowCapture {
 
     /// Move and resize a window using Accessibility API (matches by CGWindowID via bounds comparison)
     public func setWindowPosition(pid: pid_t, windowTitle: String, position: CGPoint, size: CGSize, windowId: CGWindowID? = nil) -> Bool {
-        let app = AXUIElementCreateApplication(pid)
-        var windowsRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &windowsRef) == .success,
-              let windows = windowsRef as? [AXUIElement] else { return false }
+        guard let windows = getCachedAXWindows(pid: pid) else { return false }
 
         // Try to match by CGWindowID first (robust against title changes)
         if let windowId = windowId {
@@ -104,8 +133,8 @@ public final class WindowCapture {
 
     /// Find AXUIElement window matching a CGWindowID by comparing bounds with CGWindowList
     private func findAXWindow(axWindows: [AXUIElement], pid: pid_t, targetWindowId: CGWindowID) -> AXUIElement? {
-        // Get the target window's current bounds from CGWindowList
-        guard let windowList = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] else { return nil }
+        // Get the target window's current bounds from CGWindowList (uses frame cache if available)
+        let windowList = getCachedWindowList()
         var targetBounds: CGRect?
         for dict in windowList {
             guard let wid = dict[kCGWindowNumber as String] as? CGWindowID, wid == targetWindowId,
@@ -163,10 +192,7 @@ public final class WindowCapture {
 
     /// Get window position and size (matches by CGWindowID via bounds comparison)
     public func getWindowPosition(pid: pid_t, windowTitle: String, windowId: CGWindowID? = nil) -> (position: CGPoint, size: CGSize)? {
-        let app = AXUIElementCreateApplication(pid)
-        var windowsRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &windowsRef) == .success,
-              let windows = windowsRef as? [AXUIElement] else { return nil }
+        guard let windows = getCachedAXWindows(pid: pid) else { return nil }
 
         // Try to match by CGWindowID first
         if let windowId = windowId {

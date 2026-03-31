@@ -23,6 +23,10 @@ public final class CanvasWMEngine {
     /// Last viewport position used to detect viewport movement in syncToScreen
     private var lastSyncViewportX: Double = 0
     private var lastSyncViewportY: Double = 0
+    /// Frame counter for throttling reverse-sync (user-move detection)
+    private var syncFrameCount: Int = 0
+    /// Reverse-sync runs every N frames (5 = ~12fps at 60fps timer)
+    private static let reverseSyncInterval: Int = 5
 
     /// Directory and file for external notification triggers
     private static let notifyDir: URL = {
@@ -130,9 +134,17 @@ public final class CanvasWMEngine {
         }
         if reverseSyncCooldown > 0 { reverseSyncCooldown -= 1 }
 
+        // Throttle reverse-sync to every N frames (~12fps) — AX API calls are expensive
+        syncFrameCount += 1
+        let doReverseSync = syncFrameCount % Self.reverseSyncInterval == 0
+
         let screen = state.primaryVisibleFrame
         guard screen.width > 0 else { return }
         let screenSize = (w: Double(screen.width), h: Double(screen.height))
+
+        // Cache expensive system queries for this frame
+        windowCapture.beginFrame()
+        defer { windowCapture.endFrame() }
 
         for win in state.sortedWindows {
             guard let pid = win.ownerPid else { continue }
@@ -149,6 +161,8 @@ public final class CanvasWMEngine {
                 if let last = lastAppliedPositions[win.id],
                    abs(targetPos.x - last.x) < 1 && abs(targetPos.y - last.y) < 1,
                    last.x < 90000 {
+                    // Skip reverse sync on non-check frames for performance
+                    if !doReverseSync { continue }
                     // Skip reverse sync during cooldown to avoid false detection
                     // right after startSync or viewport movement (Accessibility API moves are async).
                     if reverseSyncCooldown > 0 { continue }
