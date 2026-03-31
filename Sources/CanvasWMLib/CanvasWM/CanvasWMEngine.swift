@@ -88,11 +88,12 @@ public final class CanvasWMEngine {
             }
         }
 
-        // Remove closed windows — prune managed windows whose real window no longer exists
-        let liveWindowIds = Set(windows.map(\.id))
+        // Remove closed windows — check against ALL windows (including other Spaces)
+        // to avoid removing windows that are just on a different virtual desktop
+        let allLiveIds = windowCapture.getAllLiveWindowIDs()
         let managedEntries = state.windows.filter { $0.value.windowId != nil }
         for (id, managed) in managedEntries {
-            if let wid = managed.windowId, !liveWindowIds.contains(wid) {
+            if let wid = managed.windowId, !allLiveIds.contains(CGWindowID(wid)) {
                 state.removeWindow(id: id)
                 lastAppliedPositions.removeValue(forKey: id)
             }

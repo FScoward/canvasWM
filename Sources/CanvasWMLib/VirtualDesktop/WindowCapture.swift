@@ -22,9 +22,29 @@ public final class WindowCapture {
         return AXIsProcessTrustedWithOptions(options)
     }
 
-    /// Get all visible windows
+    /// Get all visible windows on the current Space
     public func getWindows() -> [WindowInfo] {
-        guard let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
+        return getWindowList(options: [.optionOnScreenOnly, .excludeDesktopElements], onScreenOnly: true)
+    }
+
+    /// Get IDs of all windows that still exist (across all Spaces)
+    public func getAllLiveWindowIDs() -> Set<CGWindowID> {
+        guard let windowList = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
+            return []
+        }
+        var ids = Set<CGWindowID>()
+        for dict in windowList {
+            guard let id = dict[kCGWindowNumber as String] as? CGWindowID,
+                  let layer = dict[kCGWindowLayer as String] as? Int,
+                  layer == 0
+            else { continue }
+            ids.insert(id)
+        }
+        return ids
+    }
+
+    private func getWindowList(options: CGWindowListOption, onScreenOnly: Bool) -> [WindowInfo] {
+        guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
             return []
         }
 
@@ -51,7 +71,7 @@ public final class WindowCapture {
             $0.layer == 0 &&           // Normal windows only
             $0.bounds.width > 100 &&   // Skip tiny windows (menu extras, etc)
             $0.bounds.height > 100 &&
-            $0.isOnScreen             // Only visible windows
+            (!onScreenOnly || $0.isOnScreen)
         }
     }
 
