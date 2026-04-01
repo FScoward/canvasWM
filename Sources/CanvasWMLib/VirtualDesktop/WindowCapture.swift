@@ -54,9 +54,47 @@ public final class WindowCapture {
         return AXIsProcessTrustedWithOptions(options)
     }
 
+    /// Get the set of CGWindowIDs on the currently active Space
+    private func windowIDsOnActiveSpace() -> Set<CGWindowID>? {
+        let conn = CGSMainConnectionID()
+        guard conn != 0 else { return nil }
+        let activeSpace = CGSGetActiveSpace(conn)
+        guard activeSpace != 0 else { return nil }
+
+        // Get all normal-layer window IDs first
+        guard let allWindows = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
+            return nil
+        }
+        var normalWindowIDs: [CGWindowID] = []
+        for dict in allWindows {
+            guard let id = dict[kCGWindowNumber as String] as? CGWindowID,
+                  let layer = dict[kCGWindowLayer as String] as? Int,
+                  layer == 0 else { continue }
+            normalWindowIDs.append(id)
+        }
+        guard !normalWindowIDs.isEmpty else { return Set() }
+
+        // Query which Space each window belongs to
+        var result = Set<CGWindowID>()
+        for wid in normalWindowIDs {
+            let windowArray = [wid] as CFArray
+            let spaces = CGSCopySpacesForWindows(conn, 0x7, windowArray) as? [UInt64] ?? []
+            if spaces.contains(activeSpace) {
+                result.insert(wid)
+            }
+        }
+        return result
+    }
+
     /// Get all visible windows on the current Space
     public func getWindows() -> [WindowInfo] {
-        return getWindowList(options: [.optionOnScreenOnly, .excludeDesktopElements], onScreenOnly: true)
+        let allOnScreen = getWindowList(options: [.optionOnScreenOnly, .excludeDesktopElements], onScreenOnly: true)
+
+        // Filter to only windows on the active Space
+        guard let activeSpaceWindowIDs = windowIDsOnActiveSpace() else {
+            return allOnScreen
+        }
+        return allOnScreen.filter { activeSpaceWindowIDs.contains($0.id) }
     }
 
     /// Get IDs of all windows that still exist (across all Spaces)

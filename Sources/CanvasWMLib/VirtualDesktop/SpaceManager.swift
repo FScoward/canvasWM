@@ -43,3 +43,9 @@ func CGSMainConnectionID() -> Int
 
 @_silgen_name("CGSCopyManagedDisplaySpaces")
 func CGSCopyManagedDisplaySpaces(_ connection: Int) -> CFArray?
+
+@_silgen_name("CGSGetActiveSpace")
+func CGSGetActiveSpace(_ connection: Int) -> UInt64
+
+@_silgen_name("CGSCopySpacesForWindows")
+func CGSCopySpacesForWindows(_ connection: Int, _ mask: Int, _ windowIDs: CFArray) -> CFArray
