@@ -54,6 +54,12 @@ Bidirectional sync between canvas and real macOS windows at 60fps:
 
 `StickyNoteWindowController` manages floating NSWindows (sticky notes, markdown, browser) as independent desktop windows. These sync with `CanvasWMEngine` viewport position.
 
+## Known Pitfalls
+
+### macOS window position clamping
+
+When hiding windows off-screen at `(99999, 99999)`, macOS may clamp the actual position to the screen edge. **Never trust CGWindowList positions for windows that CanvasWM has sent off-screen.** Any code that reads back window positions (reverse-sync, recapture) must first check whether the window's canvas position places it inside the viewport before updating.
+
 ## Swift Configuration
 
 - Swift Tools Version: 6.0 with `.swiftLanguageMode(.v5)` (Swift 5 language mode)
