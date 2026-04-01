@@ -76,7 +76,9 @@ public final class CanvasWMEngine {
             )
         }
 
-        // Update titles and sizes for existing windows so they stay in sync
+        // Update titles, sizes, and positions for existing windows so they stay in sync.
+        // Position update uses CGWindowList (works for all apps including those where
+        // AX API matching fails, e.g. iTerm2 with custom window decorations).
         let liveWindowMap = Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) })
         for (id, managed) in state.windows {
             if let wid = managed.windowId, let live = liveWindowMap[wid] {
@@ -88,6 +90,28 @@ public final class CanvasWMEngine {
                 if abs(managed.width - liveW) > 1 || abs(managed.height - liveH) > 1 {
                     state.windows[id]?.width = liveW
                     state.windows[id]?.height = liveH
+                }
+                // Update position from CGWindowList as a robust fallback for reverse-sync.
+                // Only for windows visible on the main screen (skip windows hidden off-screen
+                // by CanvasWM at 99999,99999).
+                guard mainScreenFrame.intersects(live.bounds) else { continue }
+                let expectedScreenX = managed.x - state.viewportX
+                let expectedScreenY = managed.y - state.viewportY
+                // Skip if the window's canvas position puts it outside the viewport.
+                // macOS may clamp the actual position when CanvasWM hides windows at
+                // (99999,99999), making them appear on-screen — we must not overwrite
+                // the canvas position with the clamped screen position.
+                let expectedInViewport = expectedScreenX + managed.width > 0 && expectedScreenX < Double(mainScreenFrame.width) &&
+                                          expectedScreenY + managed.height > 0 && expectedScreenY < Double(mainScreenFrame.height)
+                if !expectedInViewport { continue }
+                let liveX = Double(live.bounds.origin.x)
+                let liveY = Double(live.bounds.origin.y)
+                let dx = abs(liveX - expectedScreenX)
+                let dy = abs(liveY - expectedScreenY)
+                if dx > 10 || dy > 10 {
+                    state.windows[id]?.x = liveX + state.viewportX
+                    state.windows[id]?.y = liveY + state.viewportY
+                    lastAppliedPositions[id] = CGPoint(x: liveX, y: liveY)
                 }
             }
         }
