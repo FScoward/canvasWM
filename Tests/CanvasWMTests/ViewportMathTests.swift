@@ -2,7 +2,7 @@
 // XCTest/Testing not available in Command Line Tools only environment
 
 import Foundation
-@testable import CanvasWMLib
+import CanvasWMLib
 
 func assert(_ condition: Bool, _ message: String, file: String = #file, line: Int = #line) {
     if !condition {

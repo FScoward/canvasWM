@@ -116,14 +116,24 @@ public final class CanvasWMEngine {
             }
         }
 
-        // Remove closed windows — check against ALL windows (including other Spaces)
-        // to avoid removing windows that are just on a different virtual desktop
+        // Remove windows that are closed; mark windows on other Spaces as hidden
+        // so their canvas position is preserved across virtual desktop switches.
+        let activeSpaceIds = windowCapture.getActiveSpaceWindowIDs()
         let allLiveIds = windowCapture.getAllLiveWindowIDs()
         let managedEntries = state.windows.filter { $0.value.windowId != nil }
         for (id, managed) in managedEntries {
-            if let wid = managed.windowId, !allLiveIds.contains(CGWindowID(wid)) {
+            guard let wid = managed.windowId else { continue }
+            let cgWid = CGWindowID(wid)
+            if !allLiveIds.contains(cgWid) {
+                // Window is completely gone — remove
                 state.removeWindow(id: id)
                 lastAppliedPositions.removeValue(forKey: id)
+            } else if let activeIds = activeSpaceIds, !activeIds.contains(cgWid) {
+                // Window is alive but on a different Space — hide, preserve position
+                state.windows[id]?.isOnOtherSpace = true
+            } else {
+                // Window is on the active Space — ensure flag is cleared
+                state.windows[id]?.isOnOtherSpace = false
             }
         }
 
@@ -172,6 +182,8 @@ public final class CanvasWMEngine {
 
         for win in state.sortedWindows {
             guard let pid = win.ownerPid else { continue }
+            // Skip windows on other virtual desktops — AX API can't reach them
+            if win.isOnOtherSpace { continue }
 
             // Apply canvas position to screen — only show if within viewport
             let r = state.screenRect(for: win, screenSize: screenSize)
@@ -182,9 +194,10 @@ public final class CanvasWMEngine {
                 let targetSize = CGSize(width: win.width, height: win.height)
 
                 // If target position hasn't changed, allow user to freely move the window
+                let hideX = state.offScreenHidePoint.x
                 if let last = lastAppliedPositions[win.id],
                    abs(targetPos.x - last.x) < 1 && abs(targetPos.y - last.y) < 1,
-                   last.x < 90000 {
+                   last.x < hideX - 1000 {
                     // Skip reverse sync on non-check frames for performance
                     if !doReverseSync { continue }
                     // Skip reverse sync during cooldown to avoid false detection
@@ -231,14 +244,16 @@ public final class CanvasWMEngine {
                 )
                 lastAppliedPositions[win.id] = targetPos
             } else {
-                // Hide off-screen (far away so it won't land on any monitor)
+                // Hide off-screen — use a position beyond ALL monitors so macOS
+                // doesn't clamp the window onto a secondary display.
+                let hidePoint = state.offScreenHidePoint
                 _ = windowCapture.setWindowPosition(
                     pid: pid, windowTitle: win.windowTitle,
-                    position: CGPoint(x: 99999, y: 99999),
+                    position: hidePoint,
                     size: CGSize(width: win.width, height: win.height),
                     windowId: win.windowId.map { CGWindowID($0) }
                 )
-                lastAppliedPositions[win.id] = CGPoint(x: 99999, y: 99999)
+                lastAppliedPositions[win.id] = hidePoint
             }
         }
 
@@ -339,7 +354,11 @@ public final class CanvasWMEngine {
         try? fm.removeItem(atPath: path)
 
         // Highlight matching windows
-        state.highlightWindows(ownerName: content)
+        if content.hasPrefix("windowId:"), let wid = UInt32(content.dropFirst("windowId:".count)) {
+            state.highlightWindow(cgWindowId: wid)
+        } else {
+            state.highlightWindows(ownerName: content)
+        }
 
         // Auto-dismiss after 5 seconds
         highlightDismissWork?.cancel()

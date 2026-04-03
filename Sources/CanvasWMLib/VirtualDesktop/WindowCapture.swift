@@ -54,6 +54,11 @@ public final class WindowCapture {
         return AXIsProcessTrustedWithOptions(options)
     }
 
+    /// Get the set of CGWindowIDs on the currently active Space (public alias)
+    public func getActiveSpaceWindowIDs() -> Set<CGWindowID>? {
+        return windowIDsOnActiveSpace()
+    }
+
     /// Get the set of CGWindowIDs on the currently active Space
     private func windowIDsOnActiveSpace() -> Set<CGWindowID>? {
         let conn = CGSMainConnectionID()

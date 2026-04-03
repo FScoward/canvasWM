@@ -1,6 +1,6 @@
 import Foundation
 import AppKit
-@testable import CanvasWMLib
+import CanvasWMLib
 
 func runCanvasWMStateTests() {
     // MARK: - Window CRUD

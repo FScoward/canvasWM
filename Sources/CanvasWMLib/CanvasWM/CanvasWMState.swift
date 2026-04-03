@@ -15,14 +15,39 @@ public struct ManagedWindow: Codable, Identifiable {
     public var ownerName: String
     public var windowTitle: String
     public var zIndex: Int
+    /// True when the window is alive but on a different macOS Space (virtual desktop).
+    /// Canvas position is preserved while this flag is set; syncToScreen skips these windows.
+    /// Runtime-only state — excluded from Codable.
+    public var isOnOtherSpace: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case id, x, y, width, height, windowId, ownerPid, ownerName, windowTitle, zIndex
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        x = try c.decode(Double.self, forKey: .x)
+        y = try c.decode(Double.self, forKey: .y)
+        width = try c.decode(Double.self, forKey: .width)
+        height = try c.decode(Double.self, forKey: .height)
+        windowId = try c.decodeIfPresent(UInt32.self, forKey: .windowId)
+        ownerPid = try c.decodeIfPresent(Int32.self, forKey: .ownerPid)
+        ownerName = try c.decode(String.self, forKey: .ownerName)
+        windowTitle = try c.decode(String.self, forKey: .windowTitle)
+        zIndex = try c.decode(Int.self, forKey: .zIndex)
+        isOnOtherSpace = false
+    }
 
     public init(id: String = UUID().uuidString, x: Double, y: Double,
                 width: Double = 960, height: Double = 640,
                 windowId: UInt32? = nil, ownerPid: Int32? = nil,
-                ownerName: String = "", windowTitle: String = "", zIndex: Int = 0) {
+                ownerName: String = "", windowTitle: String = "", zIndex: Int = 0,
+                isOnOtherSpace: Bool = false) {
         self.id = id; self.x = x; self.y = y; self.width = width; self.height = height
         self.windowId = windowId; self.ownerPid = ownerPid
         self.ownerName = ownerName; self.windowTitle = windowTitle; self.zIndex = zIndex
+        self.isOnOtherSpace = isOnOtherSpace
     }
 
     public var displayName: String {
@@ -57,10 +82,26 @@ public final class CanvasWMState {
     // Frozen screen geometry captured at activation time (avoids NSScreen.main shifting)
     public var primaryScreenFrame: CGRect = .zero
     public var primaryVisibleFrame: CGRect = .zero
+    /// Union of all connected screens — used to compute a hide position that is
+    /// guaranteed to be outside every monitor (prevents clamping to sub-monitors).
+    public var allScreensUnion: CGRect = .zero
 
     public func pinPrimaryScreen(_ screen: NSScreen) {
         primaryScreenFrame = screen.frame
         primaryVisibleFrame = screen.visibleFrame
+        let screens = NSScreen.screens
+        if let first = screens.first {
+            allScreensUnion = screens.dropFirst().reduce(first.frame) { $0.union($1.frame) }
+        }
+    }
+
+    /// Position far enough outside all monitors to hide a window without macOS
+    /// clamping it onto a sub-monitor.
+    public var offScreenHidePoint: CGPoint {
+        if allScreensUnion.width > 0 {
+            return CGPoint(x: allScreensUnion.maxX + 5000, y: allScreensUnion.maxY + 5000)
+        }
+        return CGPoint(x: 99999, y: 99999)
     }
 
     public init() {}
@@ -120,6 +161,13 @@ public final class CanvasWMState {
     /// Highlight windows matching the given app name (e.g. "iTerm2")
     public func highlightWindows(ownerName: String) {
         for (id, win) in windows where win.ownerName.localizedCaseInsensitiveContains(ownerName) {
+            highlightedWindowIds.insert(id)
+        }
+    }
+
+    /// Highlight a single window by CGWindowID
+    public func highlightWindow(cgWindowId: UInt32) {
+        for (id, win) in windows where win.windowId == cgWindowId {
             highlightedWindowIds.insert(id)
         }
     }

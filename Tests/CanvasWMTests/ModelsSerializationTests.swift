@@ -1,5 +1,5 @@
 import Foundation
-@testable import CanvasWMLib
+import CanvasWMLib
 
 func runModelsSerializationTests() {
     let encoder = JSONEncoder()
