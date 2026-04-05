@@ -14,6 +14,8 @@ public final class CanvasWMWindowController {
     private var mouseTrackMonitor: Any?
     private var focusKeyEventTap: CFMachPort?
     private var focusKeyRunLoopSource: CFRunLoopSource?
+    private var scrollViewportEventTap: CFMachPort?
+    private var scrollViewportRunLoopSource: CFRunLoopSource?
     private var inactivityTimer: Timer?
     private var activityMonitors: [Any] = []
     /// Seconds of inactivity before auto-hiding the minimap
@@ -61,6 +63,7 @@ public final class CanvasWMWindowController {
         minimapWindow?.orderOut(nil)
         registerFlagsMonitors()
         registerFocusKeyMonitor()
+        registerScrollViewportMonitor()
     }
 
     // MARK: - Persistent mode (Ctrl+T toggle)
@@ -112,6 +115,7 @@ public final class CanvasWMWindowController {
     public func cleanup() {
         unregisterFlagsMonitors()
         unregisterFocusKeyMonitor()
+        unregisterScrollViewportMonitor()
         fadeOutWork?.cancel()
         fadeOutWork = nil
     }
@@ -326,6 +330,74 @@ public final class CanvasWMWindowController {
         }
     }
 
+    /// Register a global CGEvent tap for Ctrl+scroll → viewport pan (niri-mac style).
+    /// Works system-wide without needing the minimap open.
+    private func registerScrollViewportMonitor() {
+        let mask: CGEventMask = (1 << CGEventType.scrollWheel.rawValue)
+        let refcon = Unmanaged.passUnretained(self).toOpaque()
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: mask,
+            callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
+                guard let refcon else { return Unmanaged.passUnretained(event) }
+                let controller = Unmanaged<CanvasWMWindowController>.fromOpaque(refcon).takeUnretainedValue()
+                if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                    if let tap = controller.scrollViewportEventTap {
+                        CGEvent.tapEnable(tap: tap, enable: true)
+                    }
+                    return Unmanaged.passUnretained(event)
+                }
+                guard event.flags.contains(.maskControl) else {
+                    return Unmanaged.passUnretained(event)
+                }
+                let isContinuous = event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
+                let dx: CGFloat
+                let dy: CGFloat
+                if isContinuous {
+                    dx = CGFloat(event.getDoubleValueField(.scrollWheelEventPointDeltaAxis2))
+                    dy = CGFloat(event.getDoubleValueField(.scrollWheelEventPointDeltaAxis1))
+                } else {
+                    dx = CGFloat(event.getDoubleValueField(.scrollWheelEventDeltaAxis2)) * 3
+                    dy = CGFloat(event.getDoubleValueField(.scrollWheelEventDeltaAxis1)) * 3
+                }
+                guard abs(dx) > 0.01 || abs(dy) > 0.01 else {
+                    return Unmanaged.passUnretained(event)
+                }
+                DispatchQueue.main.async {
+                    let scale = CGFloat(controller.wmState.scale)
+                    controller.wmState.viewport.jump(
+                        toX: controller.wmState.viewport.currentX + dx / scale,
+                        toY: controller.wmState.viewport.currentY + dy / scale
+                    )
+                    controller.engine.syncToScreen()
+                }
+                return nil  // consume event
+            },
+            userInfo: refcon
+        ) else {
+            print("[ScrollViewport] Failed to create CGEvent tap (accessibility permission needed)")
+            return
+        }
+        scrollViewportEventTap = tap
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        scrollViewportRunLoopSource = source
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+    }
+
+    private func unregisterScrollViewportMonitor() {
+        if let tap = scrollViewportEventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            scrollViewportEventTap = nil
+        }
+        if let source = scrollViewportRunLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
+            scrollViewportRunLoopSource = nil
+        }
+    }
+
     /// Find the frontmost window and center the viewport on it.
     private func centerOnFocusedWindow() {
         guard let frontApp = NSWorkspace.shared.frontmostApplication else { return }
@@ -476,7 +548,7 @@ public final class CanvasWMWindowController {
         scrollMonitor = nil; keyMonitor = nil; globalKeyMonitor = nil
     }
 
-    deinit { deactivate(); unregisterFlagsMonitors(); unregisterFocusKeyMonitor(); stopMouseTracking(); stopInactivityTimer() }
+    deinit { deactivate(); unregisterFlagsMonitors(); unregisterFocusKeyMonitor(); unregisterScrollViewportMonitor(); stopMouseTracking(); stopInactivityTimer() }
 }
 
 // Custom window that strips modifier flags from mouse events so SwiftUI
