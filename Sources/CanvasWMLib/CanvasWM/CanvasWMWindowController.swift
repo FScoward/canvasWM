@@ -405,11 +405,26 @@ public final class CanvasWMWindowController {
     }
 
     private func registerKeyMonitors() {
-        // Scroll → zoom (NSEvent monitor works reliably in panel windows)
+        // Scroll → zoom / Ctrl+Scroll → viewport pan (niri-mac pattern)
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
             guard let self, (self.isActive || self.isMetaKeyShowing),
                   let window = self.minimapWindow,
                   event.window == window else { return event }
+
+            if event.modifierFlags.contains(.control) {
+                // Ctrl+Scroll → move viewport (like niri-mac Ctrl+trackpad)
+                let dx = event.hasPreciseScrollingDeltas ? event.scrollingDeltaX : event.scrollingDeltaX * 3
+                let dy = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.scrollingDeltaY * 3
+                // Convert minimap delta to canvas coordinates (divide by scale)
+                self.wmState.viewport.jump(
+                    toX: self.wmState.viewport.currentX + dx / CGFloat(self.wmState.scale),
+                    toY: self.wmState.viewport.currentY + dy / CGFloat(self.wmState.scale)
+                )
+                self.engine.syncToScreen()
+                return nil
+            }
+
+            // No modifier → zoom at cursor position
             let delta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.scrollingDeltaY * 3
             let zoomDelta = delta > 0 ? 0.03 : -0.03
             let mouseInWindow = event.locationInWindow
