@@ -15,6 +15,13 @@ public final class CanvasWMEngine {
     private var lastAppliedPositions: [String: CGPoint] = [:]
     /// True while the user is dragging a window or widget on the minimap
     public var isDragging: Bool = false
+
+    /// Call when a drag gesture ends to suppress reverse-sync for ~0.3s.
+    /// Prevents false user-move detection while AX API async moves are still completing.
+    /// Pattern from niri-mac swapCooldown.
+    public func notifyDragEnded() {
+        reverseSyncCooldown = max(reverseSyncCooldown, 18) // 18 frames ≈ 0.3s at 60fps
+    }
     /// When true, suppress user-move detection for floating widgets (minimap is showing)
     public var isMinimapShowing: Bool = false
     /// Frames to skip reverse sync after startSync or viewport movement to avoid
@@ -157,6 +164,9 @@ public final class CanvasWMEngine {
         isArranging = true
         defer { isArranging = false }
 
+        // アニメーション完了チェック — 完了していたら .settled に遷移
+        state.viewport.settle()
+
         // Detect viewport movement and extend cooldown so reverse sync
         // doesn't fire while Accessibility API is still finishing async moves
         let vpDx = abs(state.viewportX - lastSyncViewportX)
@@ -247,6 +257,12 @@ public final class CanvasWMEngine {
                 // Hide off-screen — use a position beyond ALL monitors so macOS
                 // doesn't clamp the window onto a secondary display.
                 let hidePoint = state.offScreenHidePoint
+                // Skip AX API call if already parked at hidePoint (avoids 60fps AX calls
+                // for windows that haven't moved — pattern from niri-mac parkedWindowIDs)
+                if let last = lastAppliedPositions[win.id],
+                   abs(last.x - hidePoint.x) < 1 && abs(last.y - hidePoint.y) < 1 {
+                    continue
+                }
                 _ = windowCapture.setWindowPosition(
                     pid: pid, windowTitle: win.windowTitle,
                     position: hidePoint,

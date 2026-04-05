@@ -67,8 +67,19 @@ public final class CanvasWMState {
     public var panY: Double = 0
 
     // Monitor viewport position on canvas (what the physical monitor shows)
-    public var viewportX: Double = 0
-    public var viewportY: Double = 0
+    public var viewport: ViewportOffset2D = .settled(x: 0, y: 0)
+
+    /// 現在のX座標（後方互換アクセス用）
+    public var viewportX: Double {
+        get { Double(viewport.currentX) }
+        set { viewport.jump(toX: CGFloat(newValue), toY: viewport.currentY) }
+    }
+
+    /// 現在のY座標（後方互換アクセス用）
+    public var viewportY: Double {
+        get { Double(viewport.currentY) }
+        set { viewport.jump(toX: viewport.currentX, toY: CGFloat(newValue)) }
+    }
 
     // Managed windows on the canvas
     public var windows: [String: ManagedWindow] = [:]
@@ -152,10 +163,11 @@ public final class CanvasWMState {
                r.y + r.h > -100 && r.y < screenSize.h + 100
     }
 
-    // Move viewport to center on a window
+    // Move viewport to center on a window (animated)
     public func centerViewport(on win: ManagedWindow, screenSize: (w: Double, h: Double)) {
-        viewportX = win.x + win.width / 2 - screenSize.w / 2
-        viewportY = win.y + win.height / 2 - screenSize.h / 2
+        let toX = CGFloat(win.x + win.width / 2 - screenSize.w / 2)
+        let toY = CGFloat(win.y + win.height / 2 - screenSize.h / 2)
+        viewport.animate(toX: toX, toY: toY, duration: 0.3)
     }
 
     /// Highlight windows matching the given app name (e.g. "iTerm2")
@@ -196,8 +208,7 @@ public final class CanvasWMState {
 
     public func jumpToArea(id: String, engine: CanvasWMEngine) {
         guard let area = bookmarkedAreas[id] else { return }
-        viewportX = area.panX
-        viewportY = area.panY
+        viewport.jump(toX: CGFloat(area.panX), toY: CGFloat(area.panY))
         engine.syncToScreen()
     }
 

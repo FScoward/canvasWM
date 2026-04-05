@@ -101,8 +101,13 @@ func runCanvasWMStateTests() {
         let screenSize = (w: 1920.0, h: 1080.0)
         state.centerViewport(on: win, screenSize: screenSize)
         // expected: viewportX = 500 + 200 - 960 = -260, viewportY = 300 + 100 - 540 = -140
-        assertEqualDouble(state.viewportX, -260, message: "centerViewport x")
-        assertEqualDouble(state.viewportY, -140, message: "centerViewport y")
+        // centerViewport now animates — verify the animation target values
+        if case .animating(_, _, let toX, let toY, _, _) = state.viewport {
+            assertEqualDouble(Double(toX), -260, message: "centerViewport x")
+            assertEqualDouble(Double(toY), -140, message: "centerViewport y")
+        } else {
+            assert(false, "centerViewport should produce .animating state")
+        }
     }
 
     // MARK: - Highlight

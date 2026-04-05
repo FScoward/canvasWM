@@ -80,8 +80,8 @@ public struct CanvasWMOverlayView: View {
         let fullScreen = state.primaryScreenFrame.width > 0 ? state.primaryScreenFrame.size : screenSize
         let w = fullScreen.width * state.scale
         let h = fullScreen.height * state.scale
-        let x = state.viewportX * state.scale + state.panX
-        let y = state.viewportY * state.scale + state.panY
+        let x = state.viewport.currentX * state.scale + state.panX
+        let y = state.viewport.currentY * state.scale + state.panY
         let monitorColor = Color(red: 0.2, green: 0.6, blue: 1.0) // bright blue
         return ZStack {
             // Background fill
@@ -130,16 +130,17 @@ public struct CanvasWMOverlayView: View {
             DragGesture(minimumDistance: 3)
                 .onChanged { value in
                     if viewportDragStart == nil {
-                        viewportDragStart = CGPoint(x: state.viewportX, y: state.viewportY)
+                        viewportDragStart = CGPoint(x: state.viewport.currentX, y: state.viewport.currentY)
                         engine.isDragging = true
                     }
                     if let start = viewportDragStart {
-                        state.viewportX = start.x + value.translation.width / state.scale
-                        state.viewportY = start.y + value.translation.height / state.scale
+                        let newX = start.x + value.translation.width / state.scale
+                        let newY = start.y + value.translation.height / state.scale
+                        state.viewport.jump(toX: CGFloat(newX), toY: CGFloat(newY))
                         engine.syncToScreen()
                     }
                 }
-                .onEnded { _ in viewportDragStart = nil; engine.isDragging = false }
+                .onEnded { _ in viewportDragStart = nil; engine.isDragging = false; engine.notifyDragEnded() }
         )
     }
 
@@ -362,6 +363,7 @@ public struct CanvasWMOverlayView: View {
                 widgetDragId = nil
                 widgetDragOffset = .zero
                 engine.isDragging = false
+                engine.notifyDragEnded()
                 engine.syncToScreen()
             }
     }
@@ -434,7 +436,7 @@ public struct CanvasWMOverlayView: View {
                     engine.syncToScreen()
                 }
             }
-            .onEnded { _ in dragStart = nil; engine.isDragging = false }
+            .onEnded { _ in dragStart = nil; engine.isDragging = false; engine.notifyDragEnded() }
     }
 
     private func promptBookmarkName() {
@@ -469,7 +471,7 @@ public struct CanvasWMOverlayView: View {
                     y: windowDragOffset.height + value.translation.height / state.scale)
                 engine.syncToScreen()
             }
-            .onEnded { _ in windowDragId = nil; windowDragOffset = .zero; engine.isDragging = false }
+            .onEnded { _ in windowDragId = nil; windowDragOffset = .zero; engine.isDragging = false; engine.notifyDragEnded() }
     }
 }
 
